@@ -67,3 +67,10 @@ Small repo, strong opinions. PRs are welcome when they keep these.
   drop straight in.
 - One change per PR, and say what you tested on (macOS version,
   displays, trackpads).
+- Run `./fork-check.sh` before pushing. This repo is a fork with a
+  written contract — deliberate deltas from upstream (no Karabiner,
+  Super-direct bindings) and preserved compatibility identifiers
+  (launchd labels, state paths, the omarchy theme convention). The
+  check enforces it and CI runs it on every push; the human-readable
+  half lives in `docs/fork-boundary.md`, including the upstream-merge
+  conflict rules.
