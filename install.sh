@@ -145,6 +145,9 @@ log "Linking configs"
 link "$REPO_DIR/zsh/zshrc"           "$HOME/.zshrc"
 link "$REPO_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 link "$REPO_DIR/config/aerospace"    "$HOME/.config/aerospace"
+# ghostty reads this AND its Application Support config, so personal
+# settings there survive
+link "$REPO_DIR/config/ghostty"      "$HOME/.config/ghostty"
 
 # theme scripts on PATH (aerospace's theme chord calls ~/.local/bin/theme-next)
 mkdir -p "$HOME/.local/bin"
@@ -325,6 +328,7 @@ link "$REPO_DIR/bin/omacosy-ws" "$HOME/.local/bin/omacosy-ws"
 link "$REPO_DIR/bin/omacosy-focus-guard" "$HOME/.local/bin/omacosy-focus-guard"
 link "$REPO_DIR/bin/omacosy-ws-collapse" "$HOME/.local/bin/omacosy-ws-collapse"
 link "$REPO_DIR/bin/omacosy-update" "$HOME/.local/bin/omacosy-update"
+link "$REPO_DIR/bin/omacosy-spawn" "$HOME/.local/bin/omacosy-spawn"
 link "$REPO_DIR/bin/omacosy-float" "$HOME/.local/bin/omacosy-float"
 link "$REPO_DIR/bin/omacosy-cycle" "$HOME/.local/bin/omacosy-cycle"
 
@@ -336,11 +340,23 @@ mkdir -p "$HOME/.config/omarchy/current"
 link "$HOME/.config/omarchy" "$HOME/Library/Application Support/omarchy"
 
 if [ ! -e "$HOME/.config/omarchy/current/theme" ]; then
+  # record the pre-omacosy wallpaper per screen (once) so uninstall can
+  # put it back — theme-set is about to overwrite every display
+  if ! grep -q '^wallpaper	' "$MANIFEST" 2>/dev/null; then
+    i=0
+    "$HOME/.local/bin/omacosy-helper" wallpaper get 2>/dev/null | while IFS= read -r wp; do
+      [ -n "$wp" ] && printf 'wallpaper\t%s\t%s\n' "$i" "$wp" >> "$MANIFEST"
+      i=$((i + 1))
+    done
+  fi
   log "Applying default theme (tokyo-night)"
   "$REPO_DIR/bin/theme-set" tokyo-night
 fi
 
 # --- 4. Point Korren at the omarchy theme -----------------------------------
+# Korren is the author's terminal and not something this installer can
+# get for you — so this only touches machines that HAVE it (app bundle
+# or an existing config). Everyone else skips this without a trace.
 KORREN_CFG="$HOME/Library/Application Support/korren/config.toml"
 if [ -f "$KORREN_CFG" ]; then
   # only seed a theme when NONE is set — theme-set legitimately writes
@@ -350,7 +366,7 @@ if [ -f "$KORREN_CFG" ]; then
     printf '[theme]\nname = "omarchy"\n' >> "$KORREN_CFG"
     log "Korren theme set to follow omarchy"
   fi
-else
+elif [ -d "/Applications/Korren.app" ]; then
   mkdir -p "$(dirname "$KORREN_CFG")"
   printf '[theme]\nname = "omarchy"\n' > "$KORREN_CFG"
   log "Created Korren config (theme follows omarchy)"
@@ -375,22 +391,50 @@ fi
 if git -C "$HOME/.local/share/aerospace-swipe" apply --check "$REPO_DIR/patches/aerospace-swipe-socket-recovery.patch" 2>/dev/null; then
   git -C "$HOME/.local/share/aerospace-swipe" apply "$REPO_DIR/patches/aerospace-swipe-socket-recovery.patch"
 fi
+# sleep/wake is the one hotplug IOKit does not announce: the built-in
+# trackpad keeps its IOService across sleep, so no HID-attach fires,
+# but the multitouch callback session can die anyway — swipes were
+# silently dead after wake until a real hotplug. Re-register on wake.
+if git -C "$HOME/.local/share/aerospace-swipe" apply --check "$REPO_DIR/patches/aerospace-swipe-wake-reregister.patch" 2>/dev/null; then
+  git -C "$HOME/.local/share/aerospace-swipe" apply "$REPO_DIR/patches/aerospace-swipe-wake-reregister.patch"
+fi
 mkdir -p "$HOME/.config/aerospace-swipe"
 cp "$REPO_DIR/config/aerospace-swipe/config.json" "$HOME/.config/aerospace-swipe/config.json"
-log "Building aerospace-swipe (grant Accessibility when prompted)"
-# pre-unload: the makefile ends with launchctl load, which fails on
-# an already-loaded agent and made every re-run print a false failure
-launchctl unload "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" 2>/dev/null || true
-(cd "$HOME/.local/share/aerospace-swipe" && make install) || \
-  echo "aerospace-swipe install failed — run manually: cd ~/.local/share/aerospace-swipe && make install"
-# re-sign with the STABLE identity, and only AFTER make install: the
-# makefile signs ad-hoc, which rotates per rebuild and invalidates
-# the Accessibility grant. Keep the entitlements the makefile applied.
-if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
-  codesign -f -s "Apple Development" --identifier com.acsandmann.swipe \
-    --entitlements "$HOME/.local/share/aerospace-swipe/accessibility.entitlements" \
-    "$HOME/.local/share/aerospace-swipe/AerospaceSwipe.app" 2>/dev/null || true
-  launchctl kickstart -k "gui/$(id -u)/com.acsandmann.swipe" 2>/dev/null || true
+# Rebuilding this daemon COSTS ITS ACCESSIBILITY GRANT: measured on
+# macOS 26.3, TCC pins the grant to the exact build (any re-sign is a
+# new subject — a stable Apple Development identity does not carry it),
+# so every rebuild means dead swipes until the user re-grants. The only
+# safe rebuild is the one that does not happen: skip the whole block
+# unless the binary is missing or a source/patch actually changed.
+SWIPE_BIN="$HOME/.local/share/aerospace-swipe/AerospaceSwipe.app/Contents/MacOS/AerospaceSwipe"
+SWIPE_STALE=""
+if [ ! -x "$SWIPE_BIN" ]; then SWIPE_STALE=1
+elif find "$HOME/.local/share/aerospace-swipe/src" \
+       "$HOME/.local/share/aerospace-swipe/makefile" \
+       -newer "$SWIPE_BIN" 2>/dev/null | grep -q .; then SWIPE_STALE=1
+fi
+if [ -n "$SWIPE_STALE" ]; then
+  log "Building aerospace-swipe (grant Accessibility when prompted)"
+  launchctl unload "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" 2>/dev/null || true
+  # build and stage WITHOUT launching (`make install` ends in launchctl
+  # load): sign with the stable identity before anything runs, so the
+  # only binary launchd ever starts is the one the user grants.
+  (cd "$HOME/.local/share/aerospace-swipe" && make all bundle install_plist) || \
+    echo "aerospace-swipe build failed — run manually: cd ~/.local/share/aerospace-swipe && make install"
+  if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
+    codesign -f -s "Apple Development" --identifier com.acsandmann.swipe \
+      --entitlements "$HOME/.local/share/aerospace-swipe/accessibility.entitlements" \
+      "$HOME/.local/share/aerospace-swipe/AerospaceSwipe.app" 2>/dev/null || true
+  fi
+fi
+launchctl load "$HOME/Library/LaunchAgents/com.acsandmann.swipe.plist" 2>/dev/null || true
+# a rebuild strands the daemon in its permission-wait loop with no
+# visible symptom but dead swipes — check and say so out loud
+sleep 2
+if tail -5 /tmp/swipe.err 2>/dev/null | grep -q "Waiting for accessibility"; then
+  log "WARNING: aerospace-swipe is waiting for its Accessibility grant"
+  log "  (a rebuild makes macOS treat it as a new app — this is a macOS rule, not a bug)."
+  log "  Fix: System Settings -> Privacy & Security -> Accessibility -> toggle AerospaceSwipe"
 fi
 
 # --- 6. macOS look ----------------------------------------------------------

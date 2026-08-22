@@ -80,7 +80,10 @@ run = 'layout floating'
 # conflict-heavy secondary actions use Super+Option.
 [mode.main.binding]
 # Terminal / browser (omarchy: Super+Return, Super+Shift+Return)
-cmd-enter = 'exec-and-forget open -na @TERMINAL@'
+# through omacosy-spawn: spawns are serialized so each window's dwindle
+# split hint lands before the next window opens — spamming this chord
+# gives a clean spiral instead of a simultaneous flat pile
+cmd-enter = 'exec-and-forget $HOME/.local/bin/omacosy-spawn @TERMINAL@'
 cmd-shift-enter = 'exec-and-forget open -a @BROWSER@'
 
 # Launcher (omarchy: Super+Space)
