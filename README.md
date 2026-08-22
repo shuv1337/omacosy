@@ -11,23 +11,37 @@ this one repo.
 
 ![The omacosy desktop — themed bar over the osaka-jade wallpaper](docs/screenshots/desktop.jpg)
 
-The whole environment idles at about **157MB** of memory. Numbers per
+The whole environment idles at about **133MB** of memory. Numbers per
 process in [Memory use](#memory-use).
 
 Most of it is five small signed Swift binaries built by the installer,
 because several of the existing tools are broken on macOS 26. The
 details are under [What's inside](#whats-inside).
 
-> Built for macOS 26 (Tahoe) on one desk: a MacBook Pro plus one
-> external display. It tries to generalize (display roles instead of
+> Validated on macOS 27.0 beta on one desk: a MacBook Pro plus one
+> external display. The low-level compatibility work originated on
+> macOS 26 (Tahoe). It tries to generalize (display roles instead of
 > hardware names, per-display notch detection), but so far it has only
 > run on this machine. The permission setup is real work. Issues and
 > PRs welcome; support promises are not made.
 
+This fork's user-facing changes from upstream are:
+
+- Installation and runtime validation on macOS 27.0 beta, while
+  retaining the low-level Tahoe compatibility workarounds.
+- Command is Super directly. Karabiner, its root services, driver
+  extension and key monitoring are gone; Option carries bindings that
+  would otherwise replace essential application shortcuts.
+- The included Starship prompt is a compact Powerlevel10k port with
+  first-class Jujutsu/Git state and a Night Owl navy-and-gold palette.
+- The `night-owl` desktop theme matches the gold-forward Night Owl
+  treatment used by the paired Omarchy machine's terminal, browser and
+  editor, including its selected night-road wallpaper.
+
 ## Fresh Mac
 
 ```sh
-git clone https://github.com/paulsp94/omacosy.git ~/.local/share/omacosy &&
+git clone https://github.com/shuv1337/omacosy.git ~/.local/share/omacosy &&
 cd ~/.local/share/omacosy && ./install.sh
 ```
 
@@ -42,6 +56,11 @@ The installer is idempotent. It installs Homebrew if missing, runs
 config from your app choices, symlinks configs (backing up anything it
 would replace), hides the native menu bar, applies the default theme,
 and starts the services.
+
+Runtime helpers recognize both standard Homebrew prefixes
+(`/opt/homebrew` and `/usr/local`). The complete fresh-install path has
+only been validated on Apple Silicon; this is not a claim of full Intel
+support.
 
 See [Permissions](#permissions) for the grants it asks of you, what
 each one is used for, and what breaks without it.
@@ -58,6 +77,18 @@ restarts their agents, so an update is a pull plus a re-run, and this
 command wraps both. It refuses a clone with local edits, and refuses
 one whose branch has diverged, rather than deciding either for you.
 
+An older upstream installation that used Karabiner needs manual
+migration. This fork's installer does not stop or uninstall an existing
+Karabiner service, and it does not restore the config displaced by that
+older installer. Disable or remove Karabiner and restore any prior
+Karabiner config yourself before relying on the no-key-monitoring claims
+below.
+
+FFM updates are built and signed beside the live binary, then swapped
+in atomically. If signing fails, commonly because the login keychain is
+locked, installation stops and leaves the previous authorized FFM
+binary intact. Unlock the keychain and rerun the installer.
+
 There is no background update check. The bar makes exactly one network
 call (the weather), and a daemon polling GitHub on a timer would
 quietly make that two. Nothing here contacts the network unless you
@@ -65,10 +96,10 @@ run it.
 
 ## Permissions
 
-A window manager needs broad permissions, so here is the whole list:
-every grant, which binary asks, what it is used for, and what you lose
-by refusing it. Everything is refusable; the parts that depend on a
-grant hide themselves rather than half-work.
+A window manager needs broad permissions, so here is the whole list for
+a fresh current install: every grant, which binary asks, what it is used
+for, and what you lose by refusing it. Everything is refusable; the
+parts that depend on a grant hide themselves rather than half-work.
 
 | Grant | Who asks | What it does | Without it |
 |---|---|---|---|
@@ -127,6 +158,15 @@ BROWSER=Arc
 
 Your personal shell config belongs in `~/.zshrc.local`; the repo's
 `zshrc` wires the CLI stack and sources it.
+
+The shipped Starship config ports Shuv's compact Powerlevel10k prompt.
+It keeps the directory and nearest Jujutsu bookmark (or Git branch) on
+the left, and puts failures, duration, jobs, environment, cloud context
+and time on the right. Its navy-and-gold palette matches the custom
+Night Owl desktop treatment. Jujutsu is optional and is not installed
+by the Brewfile; without `jj`, repositories show
+`git <branch> · jj-init`. The personal path shorthand renders `repos`
+as `re` and can be changed under `[directory.substitutions]`.
 
 ## What's inside
 
@@ -300,12 +340,17 @@ on every display, and any terminal that follows omarchy's
 `~/.config/omarchy/current/theme` convention (the author's does).
 `Super+Option+Shift+T` cycles.
 
-Themes: `tokyo-night`, `catppuccin`, `gruvbox`, `osaka-jade`, `night-owl`. Each
-`themes/<name>/` holds `colors.toml` (omarchy's 22-color palette),
-`sketchybar.sh` / `borders.sh` (bar and ring colors; the file keeps its
-omarchy name and format, and the ring uses the theme accent, omarchy's
-own convention), and `backgrounds/` (wallpapers from omarchy's
-MIT-licensed theme packs). Copy a directory to add one.
+Themes: `tokyo-night`, `catppuccin`, `gruvbox`, `osaka-jade`,
+`night-owl`. Each `themes/<name>/` holds `colors.toml` (omarchy's
+22-color palette), `sketchybar.sh` / `borders.sh` (bar and ring colors;
+the file keeps its omarchy name and format), and `backgrounds/`.
+
+The first four themes retain their omarchy theme-pack backgrounds.
+Night Owl uses the canonical terminal palette with custom navy surfaces
+and a restrained gold focus accent (`#f3b042`) shared with the paired
+machine's Ghostty, Helium and Shuvcode themes. Its night-road wallpaper
+is the exact background selected on that machine. Copy a directory to
+add another theme.
 
 ## Tiling: dwindle
 
@@ -354,8 +399,10 @@ and brings the cursor with it.
 ## Focus follows mouse & swipes
 
 `omacosy-ffm`: hover focuses, with no raise over floating windows, so
-floats stay in front. It is event-driven off mouse movement, so a
-parked cursor never steals focus from a launching window. It never
+floats stay in front. Native mouse events drive normal use; a lightweight
+40ms position sampler catches synthetic motion from tools such as LAN
+Mouse, which AppKit does not always report. Both paths are movement-gated,
+so a parked cursor never steals focus from a launching window. It never
 changes focus during drags, and never through an always-on-top panel:
 hovering a Touch ID prompt leaves focus exactly where it is instead of
 falling through to the window beneath. Per-app opt-out lives in
@@ -428,17 +475,21 @@ copy of anything.
 ./uninstall.sh
 ```
 
-Manifest-driven: `install.sh` records what this machine actually gained
-(Homebrew packages that weren't already present, cloned repos, every
-`defaults` key's prior value), and `uninstall.sh` removes and restores
-exactly that. Tools and settings you had before omacosy are never
-touched. Pre-manifest installs fall back to a conservative teardown
-that leaves all Homebrew packages in place.
+For installs created by the current manifest system, `install.sh`
+records what this machine actually gained (Homebrew packages that
+weren't already present, cloned repos, every `defaults` key's prior
+value), and `uninstall.sh` removes and restores exactly that. Tools and
+settings you had before omacosy are never touched. Pre-manifest installs
+fall back to a conservative teardown that leaves all Homebrew packages
+in place. It does not migrate or restore the Karabiner config from an
+older upstream install; handle that separately as described in
+[Updating](#updating).
 
 ## License & credits
 
 MIT (see `LICENSE`). Standing on: [omarchy](https://omarchy.org)
-(the whole idea, plus MIT-licensed theme palettes and wallpapers),
+(the whole idea, plus the original theme palettes and wallpapers),
 [AeroSpace](https://github.com/nikitabobko/AeroSpace),
 [aerospace-swipe](https://github.com/acsandmann/aerospace-swipe) (MIT;
-patched here for macOS 26, fixes offered upstream).
+patched here for macOS 26, fixes offered upstream), and Sarah Drasner's
+[Night Owl](https://github.com/sdras/night-owl-vscode-theme) palette.
