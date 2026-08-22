@@ -14,7 +14,13 @@
 # mouse would otherwise hand focus straight back to whatever the pointer
 # was resting on.
 set -uo pipefail
-A="$(command -v aerospace || echo /opt/homebrew/bin/aerospace)"
+if [ -x /opt/homebrew/bin/aerospace ]; then
+  A=/opt/homebrew/bin/aerospace
+elif [ -x /usr/local/bin/aerospace ]; then
+  A=/usr/local/bin/aerospace
+else
+  A="$(command -v aerospace)"
+fi
 dir="${1:-next}"
 
 WINS="$("$A" list-windows --workspace focused --format '%{window-id}' 2>/dev/null)"

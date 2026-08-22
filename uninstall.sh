@@ -17,7 +17,6 @@ have() { [ -f "$MANIFEST" ] && grep -qxF "$1" "$MANIFEST"; }
 # Quitting AeroSpace restores windows it was managing.
 log "Stopping AeroSpace, the bar, borders"
 osascript -e 'quit app "AeroSpace"' 2>/dev/null || true
-osascript -e 'quit app "Karabiner-Elements"' 2>/dev/null || true
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" "$HOME/.local/bin/omacosy-borders"
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
@@ -111,22 +110,6 @@ restore "$HOME/.zshrc"
 restore "$HOME/.config/starship.toml"
 restore "$HOME/.config/aerospace"
 
-# re-enable Karabiner's helper agents we disabled
-for agent in Karabiner-Menu Karabiner-NotificationWindow; do
-  launchctl enable "gui/$(id -u)/org.pqrs.service.agent.$agent" 2>/dev/null || true
-done
-
-# Karabiner's config is a copied real file (its daemons can't read
-# ~/Documents). Restore a pre-omacosy config if install backed one up,
-# otherwise remove our copy.
-if have "had-karabiner-config" && [ -f "$HOME/.config/karabiner/karabiner.json.bak.omacosy" ]; then
-  log "Restoring pre-omacosy karabiner.json"
-  mv "$HOME/.config/karabiner/karabiner.json.bak.omacosy" "$HOME/.config/karabiner/karabiner.json"
-else
-  rm -f "$HOME/.config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json.bak.omacosy"
-  rmdir "$HOME/.config/karabiner" 2>/dev/null || true
-fi
-
 # Pre-omacosy, ~/.zshrc pointed at the old dotbot repo — relink if
 # nothing else restored it and that repo is still around.
 if [ ! -e "$HOME/.zshrc" ] && [ -f "$HOME/Documents/config/.dotfiles/zshrc" ]; then
@@ -175,10 +158,7 @@ cat <<'EOF'
 Done. Left in place on purpose:
   - Homebrew packages you already had before omacosy (manifest-tracked;
     without a manifest, all packages stay — remove manually)
-  - Karabiner's Caps Lock remap stops once the app is quit/uninstalled.
   - The menu bar returns fully after logging out and back in.
-  - Claude desktop's caps-lock dictation shortcut was removed during setup;
-    re-enable it in Claude's settings if you used it.
   - If AeroSpace still appears in System Settings -> General -> Login Items, remove it there.
   - The repo itself and your shell tools (fzf, eza, zoxide, ...) are untouched.
 EOF

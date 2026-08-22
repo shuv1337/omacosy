@@ -1,130 +1,154 @@
-format = """
-[](#9A348E)\
-$username\
-[](bg:#DA627D fg:#9A348E)\
-$directory\
-[](fg:#DA627D bg:#FCA17D)\
-$git_branch\
-$git_status\
-[](fg:#FCA17D bg:#86BBD8)\
-$c\
-$golang\
-$nodejs\
-$python\
-$rust\
-[](fg:#86BBD8 bg:#06969A)\
-$docker_context\
-[](fg:#06969A bg:#33658A)\
-$time\
-[ ](fg:#33658A)\
-"""
+# Starship port of Shuv's Powerlevel10k prompt. Keep the prompt compact
+# and transparent: thin Powerline separators, important context on the
+# left, transient/runtime context on the right.
 
-# Disable the blank line at the start of the prompt
+palette = "p10k"
 add_newline = false
+command_timeout = 1000
 
-# You can also replace your username with a neat symbol like  to save some space
-[username]
-show_always = true
-style_user = "bg:#9A348E"
-style_root = "bg:#9A348E"
-format = '[$user ]($style)'
+format = "$os$directory$custom "
+right_format = "$status$cmd_duration$jobs$direnv$python$kubernetes$terraform$aws$gcloud$username$hostname$time"
+
+[palettes.p10k]
+separator = "#5f7e97"
+white = "#ffffff"
+cyan = "#00afff"
+gold = "#f3b042"
+coral = "#ff5874"
+green = "#c5e478"
+amber = "#ffcb8b"
+teal = "#00afaf"
+purple = "#af87ff"
+orange = "#ff8700"
+
+[os]
+disabled = false
+style = "fg:white"
+format = "[$symbol]($style)"
+
+[os.symbols]
+Macos = ""
 
 [directory]
-style = "bg:#DA627D"
-format = "[ $path ]($style)"
-truncation_length = 3
+style = "fg:cyan bold"
+format = "[  ](fg:separator)[ $path]($style)[$read_only]($read_only_style)"
+home_symbol = "~"
+read_only = " "
+read_only_style = "fg:coral"
+truncation_length = 5
+truncate_to_repo = false
 truncation_symbol = "…/"
 
-# Here is how you can shorten some long paths by text replacement
-# similar to mapped_locations in Oh My Posh:
 [directory.substitutions]
-"Documents" = " "
+"repos" = "re"
+"Documents" = " "
 "Downloads" = " "
 "Music" = " "
 "Pictures" = " "
-# Keep in mind that the order matters. For example:
-# "Important Documents" = "  "
-# will not be replaced, because "Documents" was already substituted before.
-# So either put "Important Documents" before "Documents" or use the substituted version:
-# "Important  " = "  "
 
-[c]
-symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
+# P10k's custom_jj segment: show the nearest bookmark (or change ID).
+# In a Git-only repository, retain the old branch + jj-init reminder.
+[custom.jj]
+when = 'jj root >/dev/null 2>&1 || git rev-parse --is-inside-work-tree >/dev/null 2>&1'
+command = '''
+state=$(jj log -r @ -T 'if(bookmarks, bookmarks.map(|b| b.name()).join(", "), parents.first().bookmarks().map(|b| b.name()).join(", ")) ++ "|" ++ change_id.shortest(8) ++ "|" ++ if(conflict, "!", "")' --no-graph 2>/dev/null) || state=
+if [ -n "$state" ]; then
+  bookmark=${state%%|*}
+  rest=${state#*|}
+  change=${rest%%|*}
+  conflict=${rest#*|}
+  [ -n "$bookmark" ] || bookmark="@$change"
+  printf 'jj %s%s' "$bookmark" "${conflict:+ $conflict}"
+else
+  branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null) || exit 0
+  printf 'git %s · jj-init' "$branch"
+fi
+'''
+style = "fg:gold"
+format = "[  ](fg:separator)[$output]($style)"
 
-[docker_context]
-symbol = " "
-style = "bg:#06969A"
-format = '[[ $symbol $context ](bg:#06969A)]($style) $path'
+# P10k had prompt_char disabled. Starship therefore leaves the command
+# line immediately after the left prompt with one space.
+[character]
+disabled = true
 
-[elixir]
-symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
+# Right prompt. Each optional module owns its trailing separator so a
+# hidden module never leaves a separator floating at the left edge.
+[status]
+disabled = false
+success_symbol = "✔"
+symbol = "✘"
+not_executable_symbol = "✘"
+not_found_symbol = "✘"
+sigint_symbol = "✘"
+signal_symbol = "✘"
+style = "fg:coral"
+success_style = "fg:green"
+format = "[$symbol]($style)[  ](fg:separator)"
 
-[elm]
-symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
+[cmd_duration]
+min_time = 3000
+show_milliseconds = false
+style = "fg:separator"
+format = "[$duration]($style)[  ](fg:separator)"
 
-[git_branch]
-symbol = ""
-style = "bg:#FCA17D"
-truncation_length = 32
-format = '[[ $symbol $branch ](bg:#FCA17D)]($style)'
+[jobs]
+symbol = "✦"
+number_threshold = 1
+symbol_threshold = 1
+style = "fg:amber"
+format = "[$symbol]($style)[  ](fg:separator)"
 
-[git_status]
-style = "bg:#FCA17D"
-format = '[[($all_status$ahead_behind )](bg:#FCA17D)]($style)'
+[direnv]
+disabled = false
+style = "fg:amber"
+format = "[$symbol$loaded/$allowed]($style)[  ](fg:separator)"
 
-[golang]
-symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
-
-[haskell]
-symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
-
-[java]
-symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
-
-[julia]
-symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
-
-[nodejs]
-symbol = ""
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
-
-[nim]
-symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
-
+# Match P10k's virtualenv segment: environment name without Python version.
 [python]
 symbol = " "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
+style = "fg:teal"
+format = "[$symbol$virtualenv]($style)[  ](fg:separator)"
+detect_extensions = []
+detect_files = []
+detect_folders = []
 
-[conda]
-symbol = "🅒 "
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
+[kubernetes]
+disabled = false
+symbol = "󱃾 "
+style = "fg:purple"
+format = "[$symbol$context]($style)[  ](fg:separator)"
 
-[rust]
-symbol = ""
-style = "bg:#86BBD8"
-format = '[[ $symbol ($version) ](bg:#86BBD8)]($style)'
+[terraform]
+symbol = "󱁢 "
+style = "fg:teal"
+format = "[$symbol$workspace]($style)[  ](fg:separator)"
+
+[aws]
+symbol = " "
+style = "fg:orange"
+format = "[$symbol$profile]($style)[  ](fg:separator)"
+
+[gcloud]
+symbol = "󱇶 "
+style = "fg:teal"
+format = "[$symbol$account(@$domain)(\\($project\\))]($style)[  ](fg:separator)"
+
+[username]
+show_always = true
+style_user = "fg:gold bold"
+style_root = "fg:gold bold"
+format = "[$user]($style)"
+
+[hostname]
+ssh_only = false
+trim_at = ""
+style = "fg:gold bold"
+format = "[@$hostname]($style)[  ](fg:separator)"
 
 [time]
 disabled = false
-time_format = "%R" # Hour:Minute Format
-style = "bg:#33658A"
-format = '[[ ♥ $time ](bg:#33658A)]($style)'
+use_12hr = false
+time_format = "%H:%M:%S"
+style = "fg:separator"
+format = "[$time ]($style)"

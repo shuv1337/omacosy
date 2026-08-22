@@ -1,9 +1,10 @@
 // omacosy-ffm — focus follows mouse for the omacosy tiling setup.
-// Event-driven: a global mouseMoved monitor (rides the Accessibility
-// grant this binary needs anyway) hit-tests the topmost normal window
-// under the cursor and focuses it via SLPS + the Accessibility API.
+// Motion-driven: a global mouseMoved monitor (rides the Accessibility
+// grant this binary needs anyway) plus a cursor-position sampler for
+// synthetic pointer sources hit-test the topmost normal window under
+// the cursor and focus it via SLPS + the Accessibility API.
 // Floats stay in front — a window covered by one is focused WITHOUT
-// raise (kCPSNoWindows), and a parked cursor generates no events, so
+// raise (kCPSNoWindows), and a parked cursor generates no motion, so
 // it can never steal focus from a launching window.
 //
 // Deliberately boring: no focus changes while any mouse button is down
@@ -63,14 +64,14 @@ let ignoredApps: Set<String> = {
         .filter { !$0.isEmpty && !$0.hasPrefix("#") })
 }()
 
-// Event-driven: a global mouseMoved monitor replaces the old 80ms
-// poll. "Focus follows mouse MOVEMENT, not hover position" (Hyprland
-// semantics) is structural now — a stationary cursor produces no
-// events, so it can never steal focus (a freshly launched window that
-// self-activates under an idle pointer keeps its focus; the poll used
-// to deactivate System Settings mid-launch and sink it behind the
-// tiles). Drags are excluded for free too: dragging delivers
-// mouseDragged, never mouseMoved.
+// Motion-driven: ordinary devices arrive through a global mouseMoved
+// monitor. Some synthetic pointer sources (notably LAN Mouse on newer
+// macOS builds) move the Core Graphics cursor without reaching that
+// AppKit monitor, so a lightweight sampler also detects POSITION
+// CHANGES. Unlike the old unconditional 80ms poll, the sampler never
+// processes a stationary cursor. "Focus follows mouse MOVEMENT, not
+// hover position" (Hyprland semantics) therefore remains structural:
+// a freshly launched window under an idle pointer keeps its focus.
 let processMinInterval = 0.04 // hit-test at most ~25Hz during motion
 let dwellSeconds = 0.10 // hover this long over a new window to focus it
 
@@ -314,7 +315,8 @@ func process(confirmed: Bool) {
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 var trailArmed = false
-NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { _ in
+
+func processMotion() {
     let now = CFAbsoluteTimeGetCurrent()
     if now - lastProcessAt < processMinInterval {
         // trailing edge: a fast flick's FINAL event (the one actually
@@ -333,5 +335,25 @@ NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { _ in
     }
     lastProcessAt = now
     process(confirmed: false)
+}
+
+// Keep the sampled location in sync when AppKit does deliver a normal
+// event. That prevents the fallback timer from treating the same move
+// as a second synthetic motion.
+var sampledPointerLocation = CGEvent(source: nil)?.location
+NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { event in
+    sampledPointerLocation = event.cgEvent?.location ?? CGEvent(source: nil)?.location
+    processMotion()
+}
+
+// Catch CGEventPost / network-KVM pointer motion that changes the
+// WindowServer cursor but is omitted from NSEvent's global monitor.
+// Only changed coordinates enter the focus path, preserving the key
+// invariant that a parked pointer can never reclaim focus.
+_ = Timer.scheduledTimer(withTimeInterval: processMinInterval, repeats: true) { _ in
+    guard let location = CGEvent(source: nil)?.location else { return }
+    guard location != sampledPointerLocation else { return }
+    sampledPointerLocation = location
+    processMotion()
 }
 app.run()

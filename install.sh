@@ -146,28 +146,6 @@ link "$REPO_DIR/zsh/zshrc"           "$HOME/.zshrc"
 link "$REPO_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 link "$REPO_DIR/config/aerospace"    "$HOME/.config/aerospace"
 
-# Karabiner is COPIED, not symlinked: its background services can't read
-# configs living under ~/Documents (TCC folder protection) without Full
-# Disk Access. The repo copy is the source of truth on install.
-mkdir -p "$HOME/.config/karabiner"
-# preserve a pre-omacosy karabiner config once, for uninstall to restore
-if [ -f "$HOME/.config/karabiner/karabiner.json" ] \
-  && [ ! -f "$HOME/.config/karabiner/karabiner.json.bak.omacosy" ] \
-  && ! cmp -s "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"; then
-  cp "$HOME/.config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json.bak.omacosy"
-  mark "had-karabiner-config"
-fi
-cp "$REPO_DIR/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"
-launchctl kickstart -k "gui/$(id -u)/org.pqrs.service.agent.karabiner_console_user_server" 2>/dev/null || true
-# Karabiner's Menu and NotificationWindow helper apps idle at ~135MB
-# combined and serve a menu-bar icon we hide; remapping lives in the
-# core service, which stays
-for agent in Karabiner-Menu Karabiner-NotificationWindow; do
-  launchctl bootout "gui/$(id -u)/org.pqrs.service.agent.$agent" 2>/dev/null || true
-  launchctl disable "gui/$(id -u)/org.pqrs.service.agent.$agent" 2>/dev/null || true
-done
-pkill -f "Karabiner-Menu|Karabiner-NotificationWindow" 2>/dev/null || true
-
 # theme scripts on PATH (aerospace's theme chord calls ~/.local/bin/theme-next)
 mkdir -p "$HOME/.local/bin"
 
@@ -228,7 +206,27 @@ rm -f "$HOME/Library/LaunchAgents/com.omacosy.dwindle.plist" "$HOME/.local/bin/o
 # invalidate its Accessibility grant); runs as a launchd agent
 if [ ! -x "$HOME/.local/bin/omacosy-ffm" ] || [ "$REPO_DIR/helper/ffm.swift" -nt "$HOME/.local/bin/omacosy-ffm" ]; then
   log "Building omacosy-ffm (grant Accessibility when prompted)"
-  swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -o "$HOME/.local/bin/omacosy-ffm" "$REPO_DIR/helper/ffm.swift"
+  # Build and sign beside the installed executable, then replace it in one
+  # rename. A locked login keychain can make codesign fail in an agent shell;
+  # never let that corrupt the already-authorised binary or its TCC identity.
+  FFM_BUILD_DIR="$(mktemp -d "$HOME/.local/bin/.omacosy-ffm-build.XXXXXX")"
+  FFM_NEW="$FFM_BUILD_DIR/omacosy-ffm"
+  if ! swiftc -O -F /System/Library/PrivateFrameworks -framework SkyLight -o "$FFM_NEW" "$REPO_DIR/helper/ffm.swift"; then
+    rm -f "$FFM_NEW"
+    rmdir "$FFM_BUILD_DIR"
+    exit 1
+  fi
+  if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
+    if ! codesign -f -s "Apple Development" --identifier com.omacosy.ffm "$FFM_NEW"; then
+      log "ERROR: could not sign omacosy-ffm; the installed binary was left unchanged."
+      log "  Unlock the login keychain and rerun install.sh from Terminal."
+      rm -f "$FFM_NEW"
+      rmdir "$FFM_BUILD_DIR"
+      exit 1
+    fi
+  fi
+  mv -f "$FFM_NEW" "$HOME/.local/bin/omacosy-ffm"
+  rmdir "$FFM_BUILD_DIR"
 fi
 
 # focused-window border ring (replaces JankyBorders; no permissions;
@@ -241,7 +239,6 @@ fi
 # signing identity is present — then re-grant after each rebuild)
 if security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
   codesign -f -s "Apple Development" --identifier com.omacosy.helper "$HOME/.local/bin/omacosy-helper" 2>/dev/null || true
-  codesign -f -s "Apple Development" --identifier com.omacosy.ffm "$HOME/.local/bin/omacosy-ffm" 2>/dev/null || true
   codesign -f -s "Apple Development" --identifier com.omacosy.borders "$HOME/.local/bin/omacosy-borders" 2>/dev/null || true
   # the BUNDLE is signed now; the identifier is what grants key on
   codesign -f -s "Apple Development" --identifier com.omacosy.bar "$BAR_APP" 2>/dev/null || true
@@ -360,8 +357,8 @@ else
 fi
 
 # --- 5. Trackpad workspace swipes (aerospace-swipe) -------------------------
-# Built from source; installs a user launch agent. Config is COPIED (same
-# TCC constraint as Karabiner: launch agents can't read ~/Documents).
+# Built from source; installs a user launch agent. Config is COPIED because
+# launch agents can't read configs under ~/Documents without a TCC grant.
 if [ ! -d "$HOME/.local/share/aerospace-swipe" ]; then
   git clone -q https://github.com/acsandmann/aerospace-swipe.git "$HOME/.local/share/aerospace-swipe"
   mark "cloned-aerospace-swipe"
@@ -405,26 +402,13 @@ fi
 log "Starting AeroSpace"
 open -a AeroSpace
 
-# The remapping runs in launchd-managed services; the app itself is only
-# the settings window, and it costs ~92MB resident to leave open. Launch
-# it only when the service is not already up — i.e. a first run, where it
-# is needed to approve the driver extension.
-if launchctl list 2>/dev/null | grep -q org.pqrs.service.agent.karabiner_console_user_server; then
-  log "Karabiner already running (Caps Lock -> Super)"
-else
-  log "Starting Karabiner-Elements (approve its driver extension, then quit the app)"
-  open -a Karabiner-Elements
-fi
-
 cat <<'EOF'
 
 Done. One-time macOS steps if this is a fresh machine:
   1. Grant AeroSpace   System Settings -> Privacy & Security -> Accessibility
-  2. Karabiner-Elements: approve its driver extension + Input Monitoring
-     when prompted (System Settings -> Privacy & Security)
-  3. Korren isn't in the Brewfile — build it from the korren repo:
+  2. Korren isn't in the Brewfile — build it from the korren repo:
        ./packaging/macos/build-app.sh --install
 
-Super = hold Caps Lock. Switch themes:  theme-set <name>  or  Super+Shift+T
+Super = Command. Switch themes: theme-set <name> or Super+Option+Shift+T
 Back to a normal Mac any time:  ./uninstall.sh
 EOF

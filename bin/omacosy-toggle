@@ -5,9 +5,8 @@
 # trackpad-swipe daemons stop, the bar stops. `on` restores all of
 # it. No args = flip.
 #
-# Untouched either way: Karabiner's CapsLock=Super remap (harmless
-# while AeroSpace is off) and the native menu bar's auto-hide default
-# (the native menu bar is there once the bar is down).
+# Untouched either way: the native menu bar's auto-hide default (the
+# native menu bar is there once the bar is down).
 set -euo pipefail
 
 STATE="$HOME/.config/omacosy/disabled"

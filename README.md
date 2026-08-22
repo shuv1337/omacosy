@@ -44,8 +44,7 @@ would replace), hides the native menu bar, applies the default theme,
 and starts the services.
 
 See [Permissions](#permissions) for the grants it asks of you, what
-each one is used for, and what breaks without it. Karabiner-Elements
-also asks you to approve its driver extension.
+each one is used for, and what breaks without it.
 
 ## Updating
 
@@ -74,7 +73,7 @@ grant hide themselves rather than half-work.
 | Grant | Who asks | What it does | Without it |
 |---|---|---|---|
 | **Accessibility** | AeroSpace, AerospaceSwipe, `omacosy-ffm` | Move, resize and focus other apps' windows. This is the tiling itself, and it is the broadest permission here. | Nothing tiles. Not optional in practice. |
-| **Input Monitoring** | Karabiner-Elements, AerospaceSwipe | Karabiner reads keys to remap Caps Lock; AerospaceSwipe reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. | No Super key, no swipe gestures. |
+| **Input Monitoring** | AerospaceSwipe | Reads raw trackpad contacts, because macOS 26 stopped carrying touch data in normal events. | No swipe gestures. |
 | **Screen Recording** | `omacosy-overview` | Captures a thumbnail per window for the overview cards, including windows AeroSpace has stashed offscreen. A screenshot of the visible screen could not see those. | Cards fall back to app icons and titles. |
 | **Bluetooth** | `omacosy-bar` | Reads adapter power and the paired-device list for the bluetooth pill and its menu. | The pill hides itself. |
 | **Location** | `omacosy-bar` | Reads **only** the wi-fi network's name, which macOS classes as location data. No coordinate is ever requested; the authorisation itself is what unlocks `CWInterface.ssid()`. | The wi-fi popup's title row reads "wi-fi" instead of your network's name. Everything else is unaffected. |
@@ -101,17 +100,8 @@ Refuse the grant and you lose the name, nothing else.
 - **omacosy's own binaries never run as root.** `install.sh` uses no
   sudo, installs no LaunchDaemon, and every helper it builds runs as
   you, in your login session.
-- **Karabiner-Elements does run as root, and you should know that
-  before installing.** It is a Homebrew dependency here, purely to turn
-  Caps Lock into Super. It ships a DriverKit system extension plus
-  daemons that run as root (`Karabiner-VirtualHIDDevice-Daemon`,
-  `Karabiner-Core-Service`); that is what the driver-extension approval
-  during install is. It is the most privileged thing this repo puts on
-  your Mac, and it is third-party. Skip it if that trade is wrong for
-  you; you lose the Super key and keep everything else.
 - **Nothing here reads your keystrokes.** No omacosy binary opens a
-  keyboard event tap. Only Karabiner sees keys, which is inherent to
-  remapping one. AerospaceSwipe's event tap is gesture-only and
+  keyboard event tap. AerospaceSwipe's event tap is gesture-only and
   listen-only (`1 << NSEventTypeGesture`, `kCGEventTapOptionListenOnly`),
   so it cannot see or alter a keystroke. Debug logs
   (`/tmp/omacosy-*.log`) carry window titles, app names and workspace
@@ -143,7 +133,7 @@ Your personal shell config belongs in `~/.zshrc.local`; the repo's
 | Piece | Tool | Config |
 |---|---|---|
 | Tiling WM | [AeroSpace](https://github.com/nikitabobko/AeroSpace) | `config/aerospace/aerospace.template.toml` |
-| Super key | [Karabiner](https://karabiner-elements.pqrs.org) (Caps Lock → cmd+ctrl+alt) | `config/karabiner/` (copied, not symlinked — TCC) |
+| Super key | Native Command key; no remapper or driver extension | `config/aerospace/aerospace.template.toml` |
 | Status bar, popups, shade | `omacosy-bar` (self-compiled launchd agent, one process draws all of it) | `helper/bar.swift` |
 | Window borders + fullscreen shroud | `omacosy-borders` (self-compiled launchd agent) | `helper/borders.swift`, `config/borders.conf` |
 | Focus follows mouse | `omacosy-ffm` (self-compiled launchd agent) | `helper/ffm.swift`, `config/ffm-ignore` |
@@ -230,68 +220,72 @@ everything when the pointer leaves.
 - **Floats**: appears only while the workspace holds floating windows;
   click surfaces the next one.
 
-## Keybindings — Super = hold Caps Lock
+## Keybindings — Super = Command
 
-Karabiner remaps Caps Lock to `cmd+ctrl+alt` (a combo macOS never
-uses), so omarchy's scheme works letter-for-letter without breaking
-typing or app shortcuts. Caps Lock tapped alone is Escape.
+Command is the native Super key, matching the physical Meta key used by
+the paired Omarchy/Hyprland machine. Core window and workspace actions
+use Command directly. Actions that would steal essential Mac shortcuts
+(Save, Find, New Tab/Window, zoom, reload, Cmd+Tab, and reopen-tab) add
+Option instead.
 
 | Chord | Action |
 |---|---|
 | **Navigation** | |
 | `Super+1..9` | switch to this display's workspace N |
-| `Super+tab` / `Super+shift+tab` | next / previous workspace, within this display's set |
-| `Super+b` | back and forth between the last two workspaces |
+| `Super+option+tab` / `Super+option+shift+tab` | next / previous workspace, within this display's set |
+| `Super+option+b` | back and forth between the last two workspaces |
 | `Alt+tab` / `Alt+shift+tab` | cycle windows **on this workspace**, floats included |
 | `Ctrl+Alt+tab` | cycle focus between displays |
 | `Super+arrows` | focus the window in that direction |
-| `Super+s` | surface the next floating window (and bring the cursor) |
+| `Super+option+s` | surface the next floating window (and bring the cursor) |
 | **Moving windows** | |
 | `Super+shift+arrows` | move the window in that direction |
 | `Super+shift+1..9` | move the window to workspace N and follow it |
-| `Super+shift+o` | throw the window to the same slot on the other display |
-| `Super+shift+space` | throw the WHOLE workspace to the other display |
+| `Super+option+shift+o` | throw the window to the same slot on the other display |
+| `Super+option+shift+space` | throw the WHOLE workspace to the other display |
 | **Layout** | |
 | `Super+w` | close window |
-| `Super+t` | toggle floating |
-| `Super+j` | toggle split direction |
-| `Super+-` / `Super+=` | resize |
-| `Super+f` | fullscreen — on notched displays the camera strip is blacked out so it reads as true fullscreen, while the window stays in its workspace (swipes still reach it) |
-| `Super+n` | native macOS fullscreen (a separate Space — outside the workspace model, avoid unless an app needs it) |
-| `Super+r` | resize mode (`h/j/k/l`, `-`/`=`, `esc`) |
-| `Super+shift+;` | service mode (`esc` reload, `r` flatten, `⌫` close others) |
+| `Super+option+t` | toggle floating |
+| `Super+j` | toggle the workspace's horizontal / vertical split direction |
+| `Super+option+-` / `Super+option+=` | resize |
+| `Super+option+f` | fullscreen — on notched displays the camera strip is blacked out so it reads as true fullscreen, while the window stays in its workspace (swipes still reach it) |
+| `Super+option+n` | native macOS fullscreen (a separate Space — outside the workspace model, avoid unless an app needs it) |
+| `Super+option+r` | resize mode (`h/j/k/l`, `-`/`=`, `esc`) |
+| `Super+option+shift+;` | service mode (`esc` reload, `r` flatten, `⌫` close others) |
 | **Apps and system** | |
 | `Super+enter` / `Super+shift+enter` | terminal / browser |
 | `Super+space` | launcher (Raycast) |
-| `Super+shift+f` / `+m` / `+g` | files / music / messenger (set in `apps.conf`) |
-| `Super+shift+t` | next theme |
-| `Super+shift+l` | lock the screen |
-| `Super+k` | keybinding cheatsheet (this table, rendered from the config) |
+| `Super+option+shift+f` / `+m` / `+g` | files / music / messenger (set in `apps.conf`) |
+| `Super+option+shift+t` | next theme |
+| `Super+option+shift+l` | lock the screen |
+| `Super+option+k` | keybinding cheatsheet (this table, rendered from the config) |
 
-![The keybinding cheatsheet — every binding, parsed from aerospace.toml](docs/screenshots/cheatsheet.jpg)
-
-Screenshots, clipboard and app switching stay macOS's own
-(`Cmd+Shift+3/4/5`, `Cmd+C/V`, `Cmd+Tab`). `Alt+Tab` above is the
+Screenshots, clipboard, Save/Find/New Tab, and app switching stay macOS's own
+(`Cmd+Shift+3/4/5`, `Cmd+C/V`, `Cmd+S/F/T`, `Cmd+Tab`). `Alt+Tab` above is the
 *window*-scoped switcher macOS lacks.
 
-**On the modifier space.** omarchy layers `Super+Ctrl` and `Super+Alt`
-on top of `Super`. This setup cannot: Super IS `cmd+ctrl+alt`, so those
-modifiers are already spent and Shift is the only layer left, two
-against omarchy's four. Bindings that would collide are re-homed by
-mnemonic (lock is `Super+Shift+L`, not `Super+Ctrl+L`), and the
-overflow lives in binding modes instead.
+**On the modifier space.** Super is native Command, so Option and Shift
+remain available as real layers. Option is deliberately used for actions
+whose plain Command equivalent belongs to macOS or the focused app.
+The core Omarchy parity layer intentionally takes over `Cmd+1..9`,
+`Cmd+arrows`, their Shift variants, `Cmd+J`, and `Cmd+Space`; those would
+otherwise select tabs, navigate or select text, justify text, or invoke
+Spotlight. Disable or rebind Spotlight's `Cmd+Space` shortcut so Raycast owns
+it (it is disabled on the validated machine). Essential editing and app
+chords such as `Cmd+C/V/X/Z/A/S/F/T/N/R`,
+`Cmd+Tab`, and their common Shift variants remain native.
 
 Each display owns an independent set of nine workspaces, omarchy style:
 main holds 1–9, secondary holds 11–19. Same last digit means the same
 slot, and the bar and overview render only the slot digit. `Super+N`
 switches the focused monitor's slot N (via `omacosy-ws`);
-`Super+Shift+N` moves the window to that slot; `Super+Shift+O` throws
+`Super+Shift+N` moves the window to that slot; `Super+Option+Shift+O` throws
 the window to the same slot on the other monitor. Windows open on the
 workspace you're on; nothing is auto-assigned by app.
 
 **Unplugging folds the second display's workspaces into the first.**
 AeroSpace parks 11–19 on the remaining display, but `Super+N` and
-`Super+Tab` only match single-digit slots, so without help every window
+`Super+Option+Tab` only match single-digit slots, so without help every window
 on a secondary workspace would be stranded where no keybinding reaches
 it. On a monitor-count change the bar runs `omacosy-ws-collapse`: each
 occupied guest workspace empties into the lowest free 1–9 slot,
@@ -304,7 +298,7 @@ individually, so anything you opened while undocked stays put.
 `theme-set <name>` switches everything at once: bar, borders, wallpaper
 on every display, and any terminal that follows omarchy's
 `~/.config/omarchy/current/theme` convention (the author's does).
-`Super+Shift+T` cycles.
+`Super+Option+Shift+T` cycles.
 
 Themes: `tokyo-night`, `catppuccin`, `gruvbox`, `osaka-jade`. Each
 `themes/<name>/` holds `colors.toml` (omarchy's 22-color palette),
@@ -347,13 +341,14 @@ window that opens inside the hint's ~90ms gap takes focus with it. One
 hook covers both hover and keyboard focus: AeroSpace notices the focus
 `omacosy-ffm` moves, even though ffm moves it through SkyLight.
 
-Manual control (Super+J flips, resize, float) works unchanged.
+Manual control remains available: Super+J rotates the visible workspace split,
+with resize and float controls alongside it.
 
 Floats get a rescue path, because macOS will not keep them on top:
 z-order is per app, not per window, so a float sinks behind whichever
 app you focus next, and pinning it would need a private call with SIP
 off. Instead the bar grows a pill whenever the focused workspace holds
-floats, and **Super+S** or a click on that pill surfaces the next one
+floats, and **Super+Option+S** or a click on that pill surfaces the next one
 and brings the cursor with it.
 
 ## Focus follows mouse & swipes
@@ -400,10 +395,10 @@ stops managing, all daemons and the bar stop) without uninstalling;
 
 ## Memory use
 
-About **157MB** of physical footprint (what Activity Monitor calls
-Memory) across WM, bar, three background daemons, the swipe daemon and
-Karabiner, measured docked to a second display. Resident set size reads
-~322MB, but RSS counts each process's share of the same shared system
+About **133MB** of physical footprint (what Activity Monitor calls
+Memory) across WM, bar, three background daemons and the swipe daemon,
+measured docked to a second display. Resident set size reads ~261MB,
+but RSS counts each process's share of the same shared system
 frameworks more than once, so footprint is the number to compare.
 Largest first:
 
@@ -412,12 +407,11 @@ Largest first:
 | `omacosy-overview` | 36MB | 46MB |
 | `omacosy-bar` | 32MB | 55MB |
 | AeroSpace | 24MB | 85MB |
-| Karabiner (4 processes) | 24MB | 61MB |
 | `omacosy-borders` | 19MB | 29MB |
 | aerospace-swipe | 13MB | 22MB |
 | `omacosy-ffm` | 10MB | 24MB |
 
-On one display the same set measured ~155MB; the bar and the border
+On one display the same set measured ~131MB; the bar and the border
 overlay each draw per-screen, and AeroSpace carries a second workspace
 set. The figures move with uptime. `omacosy-overview` caches a
 half-resolution capture per window shown, so it starts near 9MB and
@@ -446,6 +440,5 @@ that leaves all Homebrew packages in place.
 MIT (see `LICENSE`). Standing on: [omarchy](https://omarchy.org)
 (the whole idea, plus MIT-licensed theme palettes and wallpapers),
 [AeroSpace](https://github.com/nikitabobko/AeroSpace),
-[Karabiner-Elements](https://karabiner-elements.pqrs.org),
 [aerospace-swipe](https://github.com/acsandmann/aerospace-swipe) (MIT;
 patched here for macOS 26, fixes offered upstream).

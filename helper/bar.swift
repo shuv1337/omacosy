@@ -1418,7 +1418,7 @@ extension String {
     func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }
 
-// --- cheatsheet (Super+K) --------------------------------------------------
+// --- cheatsheet (Super+Option+K) -------------------------------------------
 // Rendered from the LIVE aerospace config, never from a list kept here: a
 // cheatsheet that can disagree with the keys is worse than no cheatsheet.
 // The config's own section comments become the headings, so the grouping
@@ -1430,20 +1430,20 @@ struct CheatEntry {
     let action: String
 }
 
-// "cmd-ctrl-alt-shift-1" -> "Super+Shift+1". Super IS cmd-ctrl-alt here
-// (Caps Lock sends it), so it is collapsed back into the one key the
-// user actually presses.
+// "cmd-shift-1" -> "Super+Shift+1". Super is the Command key; secondary
+// actions add Option where a plain Command chord would steal an essential
+// macOS/app shortcut.
 func prettyKey(_ raw: String) -> String {
     var rest = raw
     var parts: [String] = []
-    if rest.hasPrefix("cmd-ctrl-alt-") {
+    if rest.hasPrefix("cmd-") {
         parts.append("Super")
-        rest = String(rest.dropFirst("cmd-ctrl-alt-".count))
+        rest = String(rest.dropFirst("cmd-".count))
     }
     while let dash = rest.firstIndex(of: "-") {
         let mod = String(rest[rest.startIndex..<dash])
         guard ["shift", "ctrl", "alt", "cmd"].contains(mod) else { break }
-        parts.append(mod == "cmd" ? "Cmd" : mod.capitalized)
+        parts.append(mod == "cmd" ? "Cmd" : mod == "alt" ? "Option" : mod.capitalized)
         rest = String(rest[rest.index(after: dash)...])
     }
     parts.append(rest.count == 1 ? rest.uppercased() : rest.capitalized)
@@ -1580,7 +1580,7 @@ final class CheatsheetView: NSView {
         body.lineWidth = 1
         body.stroke()
 
-        let title = "keybindings — Super is Caps Lock · Super+K or click to close"
+        let title = "keybindings — Super is Command · Super+Option+K or click to close"
         drawText(title, nerdFont("Bold", 12), palette.accent.withAlphaComponent(0.8),
                  leftAt: cheatPad, midY: bounds.maxY - cheatPad - 6)
 
@@ -1990,7 +1990,12 @@ final class BarView: NSView {
                 URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension")!)
         case "activity":
             DispatchQueue.global(qos: .userInitiated).async {
-                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacosy-activity", "-e", "btop"])
+                // Ghostty runs -e commands through login(1), which resets
+                // PATH to /usr/bin:/bin:/usr/sbin:/sbin — a bare "btop"
+                // never resolves there, so hand over an absolute path.
+                let btop = ["/opt/homebrew/bin/btop", "/usr/local/bin/btop"]
+                    .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "btop"
+                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacosy-activity", "-e", btop])
             }
         default: break
         }
@@ -2299,7 +2304,7 @@ func watch(_ path: String, create: Bool, handler: @escaping () -> Void) {
 // not an order change, not a visibility change, no event of any kind.
 // No publisher exists for it, so the commands that do the moving say so
 // themselves (omacosy-ws, and the overview's drag-reorder).
-// Super+K writes this; the bar has no key tap and should not grow one
+// Super+Option+K writes this; the bar has no key tap and should not grow one
 let cheatPath = "/tmp/omacosy-bar-cheatsheet"
 watch(cheatPath, create: true) { toggleCheatsheet() }
 
@@ -2344,7 +2349,7 @@ NSWorkspace.shared.notificationCenter.addObserver(
 // This is also where the guest set gets folded and unfolded. Undocked,
 // AeroSpace parks workspaces 11-19 on the one display, and omacosy-ws
 // only ever matches single-digit slots — so anything left on a guest
-// workspace is unreachable by Super+N or Super+Tab until a display
+// workspace is unreachable by Super+N or Super+Option+Tab until a display
 // comes back. omacosy-ws-collapse moves those windows into the empty
 // 1-9 slots and remembers where they came from.
 //

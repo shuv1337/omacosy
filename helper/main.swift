@@ -22,16 +22,12 @@
 //   nightshift              print night shift state (on/off)
 //   nightshift <on|off|toggle>
 //   lock                    lock the screen NOW (SACLockScreenImmediate)
-//   capslock off            clear the HID-system caps-lock latch (with the
-//                           key remapped to Super, a latched LED is
-//                           otherwise permanent)
 // Built by install.sh with swiftc (present wherever Homebrew is).
 // Bluetooth subcommands need the Bluetooth privacy permission of the
 // *responsible* process (sketchybar, for bar plugins).
 import AppKit
 import CoreAudio
 import IOBluetooth
-import IOKit.hidsystem
 
 // private but stable power API — the same symbols blueutil links
 @_silgen_name("IOBluetoothPreferenceGetControllerPowerState")
@@ -194,16 +190,6 @@ case "lock":
     typealias LockFn = @convention(c) () -> Int32
     let rc = unsafeBitCast(sym, to: LockFn.self)()
     if rc != 0 { fail("lock: SACLockScreenImmediate returned \(rc)") }
-
-case "capslock":
-    guard args.count > 2, args[2] == "off" else { fail("usage: capslock off") }
-    let svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOHIDSystem"))
-    var conn: io_connect_t = 0
-    guard IOServiceOpen(svc, mach_task_self_, UInt32(kIOHIDParamConnectType), &conn) == KERN_SUCCESS
-    else { fail("capslock: IOHIDSystem open failed") }
-    guard IOHIDSetModifierLockState(conn, Int32(kIOHIDCapsLockState), false) == KERN_SUCCESS
-    else { fail("capslock: set failed") }
-    IOServiceClose(conn)
 
 case "brightness":
     let display = builtinDisplayID()

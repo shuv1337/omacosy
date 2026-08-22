@@ -4,7 +4,6 @@ tap "nikitabobko/tap"        # aerospace
 
 # Window management + bar + borders
 cask "aerospace"
-cask "karabiner-elements"  # Caps Lock -> Super
 cask "ghostty"             # default terminal + floating TUI host (btop)
 cask "raycast"             # Super+Space launcher (the binding assumes it)
 
