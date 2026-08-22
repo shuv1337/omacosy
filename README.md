@@ -300,7 +300,7 @@ on every display, and any terminal that follows omarchy's
 `~/.config/omarchy/current/theme` convention (the author's does).
 `Super+Option+Shift+T` cycles.
 
-Themes: `tokyo-night`, `catppuccin`, `gruvbox`, `osaka-jade`. Each
+Themes: `tokyo-night`, `catppuccin`, `gruvbox`, `osaka-jade`, `night-owl`. Each
 `themes/<name>/` holds `colors.toml` (omarchy's 22-color palette),
 `sketchybar.sh` / `borders.sh` (bar and ring colors; the file keeps its
 omarchy name and format, and the ring uses the theme accent, omarchy's
