@@ -221,7 +221,9 @@ Why so much of it is self-built:
 ## The bar
 
 One process draws all of it: bar, popups and sliders are surfaces of
-`helper/bar.swift`. Transparent bar, everything a flat radius-4 pill.
+`helper/bar.swift`. A solid strip (`BAR_COLOR`; transparent in themes
+that leave it unset) carrying flat radius-4 pills, outlined by
+`ITEM_BORDER` when the theme defines one.
 A popup stays open while the pointer is anywhere in the bar or the
 popup, and closes when it is in neither. The bar hides itself when a
 window takes the whole display, and comes back if you put the pointer
@@ -348,7 +350,7 @@ the file keeps its omarchy name and format), and `backgrounds/`.
 
 The first four themes retain their omarchy theme-pack backgrounds.
 Night Owl uses the canonical terminal palette with custom navy surfaces
-and a restrained gold focus accent (`#f3b042`) shared with the paired
+and a subtle slate focus accent (`#7091ad`) shared with the paired
 machine's Ghostty, Helium and Shuvcode themes. Its night-road wallpaper
 is the exact background selected on that machine. Copy a directory to
 add another theme.

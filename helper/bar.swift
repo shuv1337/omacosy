@@ -115,6 +115,8 @@ func tlog(_ m: String) {
 
 struct Palette {
     var itemBG = NSColor.black
+    var barColor = NSColor.clear // strip behind the pills; clear = old floating look
+    var itemBorder = NSColor.clear // pill outline; clear = none
     var accent = NSColor.systemBlue
     var label = NSColor.white
     var muted = NSColor.gray
@@ -142,6 +144,8 @@ func loadPalette() -> Palette {
               let v = UInt64(parts[1].dropFirst(2), radix: 16) else { continue }
         switch parts[0] {
         case "ITEM_BG": p.itemBG = color(fromARGB: v)
+        case "BAR_COLOR": p.barColor = color(fromARGB: v)
+        case "ITEM_BORDER": p.itemBorder = color(fromARGB: v)
         case "ACCENT": p.accent = color(fromARGB: v)
         case "LABEL_COLOR": p.label = color(fromARGB: v)
         case "MUTED": p.muted = color(fromARGB: v)
@@ -904,23 +908,23 @@ func updateWeather() {
         var w = Weather()
         let hour = Calendar.current.component(.hour, from: Date())
         w.emoji = weatherEmoji(Int(text(current, "weatherCode")) ?? 0, night: hour < 7 || hour >= 20)
-        w.temp = text(current, "temp_C")
+        w.temp = text(current, "temp_F")
         w.desc = nested(current, "weatherDesc").lowercased()
-        w.feels = text(current, "FeelsLikeC")
-        w.low = text(today, "mintempC")
-        w.high = text(today, "maxtempC")
+        w.feels = text(current, "FeelsLikeF")
+        w.low = text(today, "mintempF")
+        w.high = text(today, "maxtempF")
         w.humidity = text(current, "humidity")
 
         let degrees = Int(text(current, "winddirDegree")) ?? 0
         let arrows = ["↓", "↙", "←", "↖", "↑", "↗", "→", "↘"]
-        w.wind = "\(arrows[((degrees + 180) / 45) % 8]) \(text(current, "windspeedKmph")) km/h"
+        w.wind = "\(arrows[((degrees + 180) / 45) % 8]) \(text(current, "windspeedMiles")) mph"
 
         // rain earns a row only with real signal: falling now, or likely today
-        let precip = Double(text(current, "precipMM")) ?? 0
+        let precip = Double(text(current, "precipInches")) ?? 0
         let chance = ((today["hourly"] as? [[String: Any]]) ?? [])
             .compactMap { Int(($0["chanceofrain"] as? String) ?? "0") }.max() ?? 0
         if precip > 0 {
-            w.rain = "☔ \(text(current, "precipMM"))mm now"
+            w.rain = "☔ \(text(current, "precipInches"))in now"
             if chance >= 30 { w.rain += " · rain \(chance)% today" }
         } else if chance >= 30 {
             w.rain = "☔ rain \(chance)% today"
@@ -950,7 +954,7 @@ func updateWeather() {
 
         DispatchQueue.main.async {
             weather = w
-            set("weather") { $0.icon = ""; $0.label = "\(w.emoji) \(w.temp)°C" }
+            set("weather") { $0.icon = ""; $0.label = "\(w.emoji) \(w.temp)°F" }
             if openPopup == "weather" { refreshPopup() }
         }
     }.resume()
@@ -1353,11 +1357,11 @@ func bluetoothRows() -> [PopupRow] {
 
 func weatherRows() -> [PopupRow] {
     guard let w = weather else { return [] }
-    var rows: [PopupRow] = [PopupRow(text: "\(w.emoji) \(w.temp)°C \(w.desc)", hero: true)]
+    var rows: [PopupRow] = [PopupRow(text: "\(w.emoji) \(w.temp)°F \(w.desc)", hero: true)]
 
     // feels-like earns a mention only when it differs from the real temp
-    var today = "today \(w.low)° → \(w.high)°C"
-    if w.feels != w.temp { today = "feels \(w.feels)°C · " + today }
+    var today = "today \(w.low)° → \(w.high)°F"
+    if w.feels != w.temp { today = "feels \(w.feels)°F · " + today }
     rows.append(PopupRow(text: today))
     rows.append(PopupRow(text: "wind \(w.wind) · humidity \(w.humidity)%"))
     if !w.rain.isEmpty { rows.append(PopupRow(text: w.rain)) }
@@ -1659,7 +1663,7 @@ func toggleCheatsheet() {
 //
 // So: icons centre on their INK box, text centres on CAP HEIGHT. Cap
 // height rather than ink for text because it does not move when the
-// content changes — "28°C" and "8:05 PM" sit on the same baseline.
+// content changes — "82°F" and "8:05 PM" sit on the same baseline.
 func inkBox(_ s: String, _ font: NSFont) -> CGRect {
     let line = CTLineCreateWithAttributedString(
         NSAttributedString(string: s, attributes: [.font: font]))
@@ -1718,7 +1722,8 @@ let chipPad: CGFloat = 2
 let pillHeight: CGFloat = 26
 let chipPillHeight: CGFloat = 20
 let radius: CGFloat = 4
-let gap: CGFloat = 14
+let gap: CGFloat = 8
+let pillPad: CGFloat = 7 // pill side padding, content to edge
 
 // The terminal the activity pill opens btop in. install.sh writes the
 // RESOLVED choice (apps.local.conf overrides already applied) next to the
@@ -1760,7 +1765,7 @@ final class BarView: NSView {
     // advance the way the leading edge is not.
     private func mediaLayout(_ titleFont: NSFont, _ iconFont: NSFont)
         -> (width: CGFloat, glyphs: [(String, String, CGFloat, CGFloat)], titleX: CGFloat) {
-        var x: CGFloat = 10
+        var x: CGFloat = pillPad
         var placed: [(String, String, CGFloat, CGFloat)] = []
         for (name, glyph) in mediaGlyphs() {
             let w = inkBox(glyph, iconFont).width
@@ -1770,7 +1775,7 @@ final class BarView: NSView {
         x += 6 // transport-to-title gap, on top of the 6 already added
         let titleX = x
         let ink = inkBox(clippedTitle, titleFont)
-        return (titleX + ink.maxX + 10, placed, titleX)
+        return (titleX + ink.maxX + pillPad, placed, titleX)
     }
 
     private func mediaSize(_ titleFont: NSFont, _ iconFont: NSFont) -> CGFloat {
@@ -1788,8 +1793,7 @@ final class BarView: NSView {
         guard model.media.running, !model.media.title.isEmpty else { return }
         let width = mediaSize(titleFont, iconFont)
         let pill = NSRect(x: origin, y: (barHeight - pillHeight) / 2, width: width, height: pillHeight)
-        palette.itemBG.setFill()
-        NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+        drawPillBG(pill)
 
         let layout = mediaLayout(titleFont, iconFont)
         for (name, glyph, dx, w) in layout.glyphs {
@@ -1807,7 +1811,26 @@ final class BarView: NSView {
         drawText(s, font, color, centeredIn: box)
     }
 
+    // One fill for every pill. With a solid strip behind them (BAR_COLOR),
+    // a pill in the bar's own colour disappears — ITEM_BORDER keeps a
+    // subtle outline so items still read as items.
+    private func drawPillBG(_ rect: NSRect) {
+        palette.itemBG.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        if palette.itemBorder.alphaComponent > 0 {
+            let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5),
+                                    xRadius: radius, yRadius: radius)
+            palette.itemBorder.setStroke()
+            path.lineWidth = 1
+            path.stroke()
+        }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
+        // solid strip behind the pills — BAR_COLOR, as sketchybar drew it;
+        // clear in themes that keep the floating-pill look
+        palette.barColor.setFill()
+        bounds.fill()
         chipRects.removeAll()
         itemRects.removeAll()
         mediaRects.removeAll()
@@ -1830,18 +1853,16 @@ final class BarView: NSView {
         // apple pill: the system menu the hidden native menu bar carried
         let appleGlyph = "\u{f179}"
         let appleFont = nerdFont("Bold", 15)
-        let appleW = inkBox(appleGlyph, appleFont).width + 20
+        let appleW = inkBox(appleGlyph, appleFont).width + pillPad * 2 + 6
         let apple = NSRect(x: padLeft, y: (barHeight - pillHeight) / 2, width: appleW, height: pillHeight)
-        palette.itemBG.setFill()
-        NSBezierPath(roundedRect: apple, xRadius: radius, yRadius: radius).fill()
+        drawPillBG(apple)
         drawIcon(appleGlyph, appleFont, palette.accent, centeredIn: apple)
         appleRect = NSRect(x: apple.minX, y: 0, width: appleW, height: barHeight)
 
         let bracketW = CGFloat(shown.count) * (chipBox + chipPad * 2)
         let bracket = NSRect(x: apple.maxX + 10, y: (barHeight - pillHeight) / 2,
                              width: bracketW, height: pillHeight)
-        palette.itemBG.setFill()
-        NSBezierPath(roundedRect: bracket, xRadius: radius, yRadius: radius).fill()
+        drawPillBG(bracket)
 
         var x = bracket.minX
         for ws in shown {
@@ -1875,9 +1896,8 @@ final class BarView: NSView {
         if !model.frontApp.isEmpty {
             let textW = advance(model.frontApp, appFont)
             let pill = NSRect(x: bracket.maxX + gap, y: (barHeight - pillHeight) / 2,
-                              width: textW + 20, height: pillHeight)
-            palette.itemBG.setFill()
-            NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+                              width: textW + pillPad * 2, height: pillHeight)
+            drawPillBG(pill)
             draw(model.frontApp, appFont, palette.accent, centeredIn: pill)
             leftEdge = pill.maxX
         }
@@ -1909,19 +1929,18 @@ final class BarView: NSView {
             let iconInk = hasIcon ? inkBox(item.icon, iconFont).width : 0
             let labelAdv = hasLabel ? advance(item.label, labelFont) : 0
             let innerGap: CGFloat = hasIcon && hasLabel ? 7 : 0
-            let width = 10 + iconInk + innerGap + labelAdv + 10
+            let width = pillPad + iconInk + innerGap + labelAdv + pillPad
             let pill = NSRect(x: cursor - width, y: (barHeight - pillHeight) / 2,
                               width: width, height: pillHeight)
-            palette.itemBG.setFill()
-            NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+            drawPillBG(pill)
             if hasIcon {
                 drawIcon(item.icon, iconFont, iconColor,
-                         centeredIn: NSRect(x: pill.minX + 10, y: pill.minY,
+                         centeredIn: NSRect(x: pill.minX + pillPad, y: pill.minY,
                                             width: iconInk, height: pill.height))
             }
             if hasLabel {
                 drawText(item.label, labelFont, palette.label,
-                         leftAt: pill.minX + 10 + iconInk + innerGap, midY: pill.midY)
+                         leftAt: pill.minX + pillPad + iconInk + innerGap, midY: pill.midY)
             }
             itemRects.append((name, NSRect(x: pill.minX, y: 0, width: width, height: barHeight)))
             cursor = pill.minX - gap

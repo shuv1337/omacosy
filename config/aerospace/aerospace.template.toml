@@ -55,15 +55,15 @@ exec-on-workspace-change = ['/bin/bash', '-c',
 ]
 
 [gaps]
-inner.horizontal = 8
-inner.vertical = 8
-outer.left = 8
-outer.bottom = 8
-outer.right = 8
+inner.horizontal = 4
+inner.vertical = 4
+outer.left = 4
+outer.bottom = 4
+outer.right = 4
 # room for the bar: measured from the display top on flat monitors,
 # but from below the notch strip on built-in notched displays (macOS
 # reports usable space starting there), so the laptop needs less
-outer.top = [{ monitor.'built-in' = 10 }, 42]
+outer.top = [{ monitor.'built-in' = 6 }, 38]
 
 # Fixed-size settings windows fight the tiler (resize -> snap back ->
 # relayout flicker); float them instead.
