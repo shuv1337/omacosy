@@ -271,54 +271,102 @@ case "split-hint":
     // State is one line: "wid w h ts". A 3s TTL bounds how stale a
     // chain can get (manual resizes, closes, and workspace switches
     // invalidate predictions; a burst of opens never lives that long).
-    func frame() -> (CGFloat, CGFloat, CGFloat, CGFloat)? {
-        guard let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, wid) as? [[String: Any]],
+    func frame(_ id: UInt32) -> (CGFloat, CGFloat, CGFloat, CGFloat)? {
+        guard let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]],
             let b = list.first?[kCGWindowBounds as String] as? [String: CGFloat],
             let x = b["X"], let y = b["Y"],
             let w = b["Width"], let h = b["Height"] else { return nil }
         return (x, y, w, h)
     }
     let splitWidthMultiplier: CGFloat = 1.4
-    let statePath = "/tmp/omacosy-split-state-\(getuid())"
+    let uid = getuid()
+    let statePath = "/tmp/omacosy-split-state-\(uid)"
+    let seenPath = "/tmp/omacosy-split-seen-\(uid)"
     let now = Date().timeIntervalSince1970
-    var state: (wid: UInt32, w: CGFloat, h: CGFloat)?
+
+    // NEW vs REFOCUSED is the whole ballgame, and a window id alone
+    // cannot answer it: ids only grow, so "id higher than the last one
+    // hinted" is also true of simply focusing a newer window that has
+    // been open for hours — which had prediction inventing a slot for a
+    // window sitting in plain sight. Every id we have hinted is
+    // remembered instead, so newness is a fact rather than a guess.
+    var seen = (try? String(contentsOfFile: seenPath, encoding: .utf8))?
+        .split(separator: "\n").map(String.init) ?? []
+    let isNew = !seen.contains(idStr)
+
+    // The focused workspace, as aerospace's own workspace hook records
+    // it — a chain must not span a workspace switch, where the previous
+    // window's slot says nothing about the new window's.
+    let ws = (try? String(contentsOfFile: "/tmp/omacosy-bar-ws", encoding: .utf8))?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+    // State is one line: "wid w h ts ws".
+    var state: (wid: UInt32, w: CGFloat, h: CGFloat, ws: String)?
     if let line = try? String(contentsOfFile: statePath, encoding: .utf8) {
-        let f = line.split(separator: " ").compactMap { Double($0) }
-        if f.count == 4, now - f[3] < 3 { state = (UInt32(f[0]), CGFloat(f[1]), CGFloat(f[2])) }
+        let f = line.split(separator: " ").map(String.init)
+        if f.count >= 4, let sw = UInt32(f[0]),
+            let sww = Double(f[1]), let shh = Double(f[2]) {
+            state = (sw, CGFloat(sww), CGFloat(shh), f.count >= 5 ? f[4] : ws)
+        }
     }
+
+    // A chain is trustworthy when the window it came from is STILL
+    // sitting where we left it. Checking that beats the wall-clock TTL
+    // this replaced: three seconds declared a chain dead between two
+    // deliberate Super+Return presses — the ordinary human pace — and
+    // dropped every second window onto the measure path below, which is
+    // exactly where it was mis-measured. Age is not the risk; a layout
+    // that moved underneath is, and that is what this sees.
+    //
+    // Either frame is consistent: the recorded slot if the split has
+    // not landed yet, or the half it becomes once it has. The tolerance
+    // covers gaps and rounding.
+    func chainValid(_ s: (wid: UInt32, w: CGFloat, h: CGFloat, ws: String)) -> Bool {
+        guard s.ws == ws, wid > s.wid, let f = frame(s.wid) else { return false }
+        let half: (CGFloat, CGFloat) = s.w >= s.h * splitWidthMultiplier
+            ? (s.w / 2, s.h) : (s.w, s.h / 2)
+        let tol: CGFloat = 16
+        return (abs(f.2 - s.w) <= tol && abs(f.3 - s.h) <= tol)
+            || (abs(f.2 - half.0) <= tol && abs(f.3 - half.1) <= tol)
+    }
+
     var w: CGFloat
     var h: CGFloat
     var how: String
-    if let s = state, wid > s.wid {
-        // fresh spawn inside a burst: its slot is the half left over
-        // from the split we just issued on the previous window
+    if isNew, let s = state, chainValid(s) {
+        // a new window: its slot is the half left over from the split
+        // already issued on the window it opened next to
         if s.w >= s.h * splitWidthMultiplier { w = s.w / 2; h = s.h } else { w = s.w; h = s.h / 2 }
         how = "predicted"
-    } else if state != nil, let f = frame() {
-        // an existing window refocused mid-burst: its frame is settled
-        (w, h) = (f.2, f.3)
-        how = "read"
-    } else {
-        // no fresh chain to ride: wait for the frame to stop moving.
-        // "Two equal samples" alone is not enough — an untiled window's
-        // frame equals itself — so a new window must MOVE (get tiled)
-        // before its frame is trusted, while a hover-focused window that
-        // never moves is accepted after a short grace. Full bounds, not
-        // just size: a spawning terminal inherits the last window's
-        // size, so only the position reliably changes on tile.
-        var sample = frame()
+    } else if isNew {
+        // a new window with no chain to ride (first of a workspace, or
+        // a layout that moved): wait for AeroSpace to tile it. A new
+        // window MUST move before its frame means anything — measured
+        // untiled it reads as the app's own spawn size, and Ghostty now
+        // spawns deliberately small. Quiet is also not enough on its
+        // own: a window passes through intermediate frames on the way
+        // to its slot and can hold one across two samples, which is how
+        // a half-width slot got measured full-width and split the wrong
+        // way. Three quiet samples after a move, not one.
+        var sample = frame(wid)
         var moved = false
-        for tick in 1...16 {
+        var stable = 0
+        for tick in 1...28 {
             usleep(75_000)
-            let next = frame()
-            if let a = sample, let b = next, a != b { moved = true }
-            if next == nil || (moved && next! == sample!) { sample = next; break }
+            guard let next = frame(wid) else { break }
+            if let a = sample, next != a { moved = true; stable = 0 } else { stable += 1 }
             sample = next
-            if !moved && tick >= 5 { break }
+            if moved && stable >= 3 { break }
+            if !moved && tick >= 8 { break } // never tiled (floating): take it
         }
         guard let f = sample else { exit(0) }
         (w, h) = (f.2, f.3)
         how = moved ? "settled" : "static"
+    } else {
+        // already open and already in its slot: read it, no waiting
+        guard let f = frame(wid) else { exit(0) }
+        (w, h) = (f.2, f.3)
+        how = "read"
     }
     // Direction: Hyprland's rule is `stack when h * multiplier > w`
     // (dwindle:split_width_multiplier, default 1.0). At 1.0 an
@@ -336,7 +384,14 @@ case "split-hint":
     split.standardError = FileHandle.nullDevice
     try? split.run()
     split.waitUntilExit()
-    try? "\(wid) \(w) \(h) \(now)".write(toFile: statePath, atomically: true, encoding: .utf8)
+    try? "\(wid) \(w) \(h) \(now) \(ws)".write(toFile: statePath, atomically: true, encoding: .utf8)
+    // remember this id so the next hook for it is read, not predicted.
+    // Bounded: the tail is all a chain can ever reach back to.
+    if isNew {
+        seen.append(idStr)
+        if seen.count > 400 { seen = Array(seen.suffix(200)) }
+        try? seen.joined(separator: "\n").write(toFile: seenPath, atomically: true, encoding: .utf8)
+    }
     if let d = "\(Date().timeIntervalSince1970) wid=\(idStr) \(Int(w))x\(Int(h)) (\(how)) -> \(dir == "horizontal" ? "h" : "v") rc=\(split.terminationStatus)\n".data(using: .utf8),
         let fh = FileHandle(forWritingAtPath: "/tmp/omacosy-split-hint.log") ?? {
             FileManager.default.createFile(atPath: "/tmp/omacosy-split-hint.log", contents: nil)
