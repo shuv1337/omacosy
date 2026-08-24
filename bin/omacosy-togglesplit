@@ -1,0 +1,44 @@
+#!/bin/bash
+# omacosy-togglesplit — Hyprland's Super+J (togglesplit) on AeroSpace.
+#
+# `layout --root tiles horizontal vertical` rotates the workspace's ROOT
+# container, and that is the right command right up until the root holds
+# a single child: rotating a container with one child moves nothing, and
+# AeroSpace still exits 0, so the key silently does nothing. That state
+# is not exotic — omacosy's own dwindle emulation issues `aerospace
+# split`, which wraps windows in sub-containers, so a workspace can end
+# up with every window one level below the root and the key dead for as
+# long as that workspace lives.
+#
+# Flattening first would make the key always work, at the price of
+# collapsing the dwindle spiral into a flat row on every press. So the
+# rotation is TRIED first and the pixels are compared: if the layout
+# actually changed, the spiral is left alone. Only when nothing moved is
+# the tree flattened and the rotation retried — the case where the
+# alternative was doing nothing at all.
+set -u
+AEROSPACE=/opt/homebrew/bin/aerospace
+[ -x "$AEROSPACE" ] || AEROSPACE=$(command -v aerospace) || exit 0
+HELPER="$HOME/.local/bin/omacosy-helper"
+
+ids=$("$AEROSPACE" list-windows --workspace focused --format '%{window-id}' 2>/dev/null | tr '\n' ' ')
+# nothing to rotate, and nothing to flatten either
+case "${ids// /}" in '') exit 0 ;; esac
+
+frames() { [ -x "$HELPER" ] && "$HELPER" frames $ids 2>/dev/null; }
+
+before=$(frames)
+"$AEROSPACE" layout --root tiles horizontal vertical 2>/dev/null
+
+# AeroSpace applies the new geometry through the Accessibility API, which
+# lands a frame or two later; sample until it settles rather than racing
+# it with one fixed sleep.
+for _ in 1 2 3 4 5 6; do
+  sleep 0.05
+  after=$(frames)
+  [ "$after" != "$before" ] && exit 0   # it moved: spiral preserved
+done
+
+# Nothing moved — the single-child root. Flatten and rotate for real.
+"$AEROSPACE" flatten-workspace-tree 2>/dev/null
+"$AEROSPACE" layout --root tiles horizontal vertical 2>/dev/null

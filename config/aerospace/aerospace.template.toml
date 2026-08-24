@@ -118,8 +118,12 @@ cmd-alt-k = 'exec-and-forget /usr/bin/touch /tmp/omacosy-bar-cheatsheet'
 cmd-alt-s = 'exec-and-forget $HOME/.local/bin/omacosy-float'
 # A focused window is a leaf: `layout tiles horizontal vertical` only changes
 # its metadata and leaves sibling geometry untouched. `--root` rotates the
-# actual workspace split, which is the visible togglesplit behavior we want.
-cmd-j = 'layout --root tiles horizontal vertical'
+# actual workspace split, which is the visible togglesplit behavior we want —
+# except on a root holding a single child, where it moves nothing and still
+# exits 0. omacosy-togglesplit rotates, checks whether anything actually
+# moved, and only then flattens and retries, so a dwindle spiral survives
+# every press that did not need the bigger hammer.
+cmd-j = 'exec-and-forget $HOME/.local/bin/omacosy-togglesplit'
 cmd-alt-f = 'fullscreen --no-outer-gaps'
 # native (green-button) fullscreen: the only mode that may claim the
 # notch strip on the built-in display; deliberate enter/exit only

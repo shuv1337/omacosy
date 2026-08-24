@@ -16,6 +16,9 @@
 //   bt connect <address> / bt disconnect <address>
 //   input-age               seconds since the last deliberate user input
 //                           (keys/clicks/scroll), for the focus guard
+//   frames <id>...          "<id> <x> <y> <w> <h>" per window that still
+//                           exists, for telling a layout command that
+//                           moved something from one that silently did not
 //   brightness              print the built-in display's brightness (0-100)
 //   brightness set <0-100>  set it (DisplayServices — built-in/Apple
 //                           displays only; external DDC is out of scope)
@@ -476,6 +479,22 @@ case "bt":
         fail("usage: bt power [on|off|toggle] | bt devices | bt connect <addr> | bt disconnect <addr>")
     }
 
+case "frames":
+    // Geometry for named windows, in one call. AeroSpace reports what it
+    // INTENDS ("already in the requested tiling mode") but a rotation of a
+    // container holding a single child moves nothing on screen, and the
+    // exit code is 0 either way — so the only honest test of whether a
+    // layout command did anything is the pixels before and after.
+    // Ids that have closed are skipped rather than faked.
+    for a in args.dropFirst(2) {
+        guard let id = UInt32(a),
+            let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]],
+            let b = list.first?[kCGWindowBounds as String] as? [String: CGFloat],
+            let x = b["X"], let y = b["Y"], let w = b["Width"], let h = b["Height"]
+        else { continue }
+        print("\(a) \(Int(x)) \(Int(y)) \(Int(w)) \(Int(h))")
+    }
+
 default:
-    fail("usage: omacosy-helper cursor | displays | wallpaper <path> | audio ... | bt ... | brightness [set <0-100>] | input-age")
+    fail("usage: omacosy-helper cursor | displays | wallpaper <path> | audio ... | bt ... | brightness [set <0-100>] | input-age | frames <id>...")
 }

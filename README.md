@@ -392,8 +392,13 @@ and another window may grab focus before the hint lands. One hook
 covers both hover and keyboard focus: AeroSpace notices the focus
 `omacosy-ffm` moves, even though ffm moves it through SkyLight.
 
-Manual control remains available: Super+J rotates the visible workspace split,
-with resize and float controls alongside it.
+Manual control remains available: Super+J rotates the visible workspace
+split, with resize and float controls alongside it. It rotates the root
+container, which is a no-op when that container holds a single child —
+a shape `aerospace split` can leave behind, and one AeroSpace reports as
+success. So `omacosy-togglesplit` compares the window frames either side
+of the rotation and only flattens the tree and retries when nothing
+actually moved, leaving a dwindle spiral intact the rest of the time.
 
 Floats get a rescue path, because macOS will not keep them on top:
 z-order is per app, not per window, so a float sinks behind whichever
