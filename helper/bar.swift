@@ -871,7 +871,11 @@ func weatherEmoji(_ code: Int, night: Bool) -> String {
     case 299, 302, 305, 308, 356, 359: return "🌧️"
     case 200, 386, 389, 392, 395: return "⛈️"
     case 179, 182, 185, 227, 230, 281, 284, 311...338, 350, 362...368, 374...377: return "❄️"
-    default: return "🌡️"
+    // No glyph for a code we do not recognise — including the 0 a
+    // missing weatherCode falls back to, which is how a thermometer
+    // ended up standing in for "wttr said nothing useful". The
+    // temperature alone reads better than a placeholder.
+    default: return ""
     }
 }
 
@@ -954,7 +958,10 @@ func updateWeather() {
 
         DispatchQueue.main.async {
             weather = w
-            set("weather") { $0.icon = ""; $0.label = "\(w.emoji) \(w.temp)°F" }
+            set("weather") {
+                $0.icon = ""
+                $0.label = w.emoji.isEmpty ? "\(w.temp)°F" : "\(w.emoji) \(w.temp)°F"
+            }
             if openPopup == "weather" { refreshPopup() }
         }
     }.resume()
@@ -1357,7 +1364,8 @@ func bluetoothRows() -> [PopupRow] {
 
 func weatherRows() -> [PopupRow] {
     guard let w = weather else { return [] }
-    var rows: [PopupRow] = [PopupRow(text: "\(w.emoji) \(w.temp)°F \(w.desc)", hero: true)]
+    let head = w.emoji.isEmpty ? "\(w.temp)°F \(w.desc)" : "\(w.emoji) \(w.temp)°F \(w.desc)"
+    var rows: [PopupRow] = [PopupRow(text: head, hero: true)]
 
     // feels-like earns a mention only when it differs from the real temp
     var today = "today \(w.low)° → \(w.high)°F"
