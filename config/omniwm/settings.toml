@@ -764,7 +764,7 @@ binding = "Unassigned"
 id = "moveToRoot"
 
 [[hotkeys]]
-binding = "Control+Option+Command+J"
+binding = "Command+J"
 id = "toggleSplit"
 
 [[hotkeys]]

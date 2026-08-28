@@ -400,7 +400,8 @@ switch installs and removes, and Super+Space opens OmniWM's command
 palette instead of Raycast. Direct `Command+1…9` and
 `Command+Shift+1…9` are native OmniWM bindings, preserving this fork's
 original workspace muscle memory and working through virtual keyboards
-such as LAN Mouse; Caps Lock Super remains available through Karabiner.
+such as LAN Mouse. `Command+J` natively toggles the focused dwindle
+split; Caps Lock Super remains available through Karabiner.
 
 Beta honesty: multi-monitor under OmniWM is untested by the author so
 far, and docs/omniwm-port.md carries a ledger of upstream quirks found
