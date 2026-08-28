@@ -5,7 +5,7 @@
 # file is the live-tested mirror (2026-08-26). After an OmniWM upgrade
 # adds required keys, follow docs/omniwm-port.md "0.6.3 UPGRADE TRAP":
 # let the new version write defaults, then patch our keys back in.
-# theme-set rewrites [borders.color] per theme; GUI rewrites strip
+# theme-set rewrites the border and overview colors per theme; GUI rewrites strip
 # comments — the repo copy is the reference, the live copy is state.
 monitorBarOverrides = []
 monitorDwindleOverrides = []
@@ -19,13 +19,13 @@ mode = "dark"
 
 [borders]
 enabled = true
-width = 5.0
+width = 2.0
 
 [borders.color]
 alpha = 1.0
-blue = 0.4588235294117647
-green = 0.5803921568627451
-red = 0.3137254901960784
+blue = 0.6784313725490196
+green = 0.5686274509803921
+red = 0.4392156862745098
 
 [clipboard]
 historyEnabled = true
@@ -107,29 +107,29 @@ zoom = 1.0
 
 [overview.backdrop]
 alpha = 1.0
-blue = 0.08
-green = 0.05
-red = 0.05
+blue = 0.15294117647058825
+green = 0.08627450980392157
+red = 0.00392156862745098
 
 [overview.windowBorders]
 
 [overview.windowBorders.hovered]
 alpha = 1.0
-blue = 1.0
-green = 0.6
-red = 0.4
+blue = 0.7607843137254902
+green = 0.6431372549019608
+red = 0.5019607843137255
 
 [overview.windowBorders.normal]
-alpha = 0.5
-blue = 0.35
-green = 0.3
-red = 0.3
+alpha = 0.65
+blue = 0.3254901960784314
+green = 0.23137254901960785
+red = 0.11372549019607843
 
 [overview.windowBorders.selected]
 alpha = 1.0
-blue = 0.4
-green = 0.8
-red = 0.3
+blue = 0.6784313725490196
+green = 0.5686274509803921
+red = 0.4392156862745098
 
 [quakeTerminal]
 animationDuration = 0.2

@@ -91,23 +91,41 @@ fi
 
 # OmniWM draws the focus border while it is the window manager (our
 # ring clips at screen edges there — no outer gaps). Its color lives in
-# settings.toml as 0-1 floats; write the theme's ACTIVE_COLOR
-# (0xAARRGGBB) into it — OmniWM live-reloads, so this recolors at once.
+# settings.toml as 0-1 floats. Its overview also ships with unrelated
+# defaults, so map both surfaces to the same palette the AeroSpace bar,
+# border ring and overview consume. OmniWM live-reloads the result.
 OMNIWM_SETTINGS="$HOME/.config/omniwm/settings.toml"
-if [ -f "$OMNIWM_SETTINGS" ] && [ -f "$THEMES_DIR/$NAME/borders.sh" ]; then
+if [ -f "$OMNIWM_SETTINGS" ] && [ -f "$THEMES_DIR/$NAME/borders.sh" ] \
+  && [ -f "$THEMES_DIR/$NAME/colors.toml" ]; then
   ACTIVE="$(grep -o 'ACTIVE_COLOR=0x[0-9a-fA-F]*' "$THEMES_DIR/$NAME/borders.sh" | head -1 | cut -d= -f2)"
   if [ -n "$ACTIVE" ]; then
-    python3 - "$OMNIWM_SETTINGS" "$ACTIVE" <<'PY'
+    python3 - "$OMNIWM_SETTINGS" "$ACTIVE" "$THEMES_DIR/$NAME/colors.toml" <<'PY'
 import re, sys
-path, argb = sys.argv[1], sys.argv[2]
-v = int(argb, 16)
-r, g, b = (v >> 16 & 0xFF) / 255, (v >> 8 & 0xFF) / 255, (v & 0xFF) / 255
+path, argb, colors_path = sys.argv[1:]
+
+def rgb(value):
+    value = value.removeprefix("0x").removeprefix("#")[-6:]
+    v = int(value, 16)
+    return (v >> 16 & 0xFF) / 255, (v >> 8 & 0xFF) / 255, (v & 0xFF) / 255
+
+colors = dict(re.findall(r'^(\w+)\s*=\s*"(#[0-9a-fA-F]{6})"', open(colors_path).read(), re.M))
 t = open(path).read()
-sec = re.search(r'\[borders\.color\]\n(?:[a-z]+ = [0-9.]+\n)+', t)
-if sec:
-    new = f"[borders.color]\nalpha = 1.0\nblue = {b}\ngreen = {g}\nred = {r}\n"
-    t = t[:sec.start()] + new + t[sec.end():]
-    open(path, 'w').write(t)
+
+def replace(section, value, alpha):
+    global t
+    r, g, b = rgb(value)
+    pattern = rf'\[{re.escape(section)}\]\n(?:[a-z]+ = [0-9.]+\n)+'
+    new = f"[{section}]\nalpha = {alpha}\nblue = {b}\ngreen = {g}\nred = {r}\n"
+    t, count = re.subn(pattern, new, t, count=1)
+    if count != 1:
+        raise SystemExit(f"theme-set: OmniWM section missing: {section}")
+
+replace("borders.color", argb, 1.0)
+replace("overview.backdrop", colors["background"], 1.0)
+replace("overview.windowBorders.normal", colors["selection_background"], 0.65)
+replace("overview.windowBorders.hovered", colors["cursor"], 1.0)
+replace("overview.windowBorders.selected", colors["accent"], 1.0)
+open(path, 'w').write(t)
 PY
   fi
 fi
