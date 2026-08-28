@@ -522,7 +522,7 @@ struct BarItem: Equatable {
 }
 
 // screen order, left to right
-let rightOrder = ["weather", "wifi", "bluetooth", "appearance", "brightness", "volume", "battery", "clock", "activity"]
+let rightOrder = ["weather", "wifi", "bluetooth", "appearance", "brightness", "volume", "battery", "clock", "activity", "shark"]
 var rightItems: [String: BarItem] = [:]
 
 func set(_ name: String, _ mutate: (inout BarItem) -> Void) {
@@ -2388,6 +2388,10 @@ final class BarView: NSView {
                     .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "btop"
                 _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacosy-activity", "-e", btop])
             }
+        case "shark":
+            DispatchQueue.global(qos: .userInitiated).async {
+                _ = shell("/usr/bin/open", ["-a", "SHarkMac", "--args", "--show-inbox"])
+            }
         default: break
         }
     }
@@ -3004,6 +3008,10 @@ watch(FileManager.default.homeDirectoryForCurrentUser
         activity.iconColor = palette.accent
         rightItems["activity"] = activity
     }
+    if var shark = rightItems["shark"] {
+        shark.iconColor = palette.red
+        rightItems["shark"] = shark
+    }
     updateAppearance()
     updateBattery()
     repaint()
@@ -3223,6 +3231,9 @@ guard !surfaces.isEmpty else {
 }
 apply(fetchSnapshot()) // blocking is fine here: the run loop has not started
 rightItems["activity"] = BarItem(icon: "󰍛", iconColor: palette.accent)
+if NSWorkspace.shared.urlForApplication(withBundleIdentifier: "dev.shuv.shark.macos") != nil {
+    rightItems["shark"] = BarItem(icon: "󱢺", iconColor: palette.red)
+}
 updateAppearance()
 applyShade() // restore the level this machine was left at
 updateBattery()
