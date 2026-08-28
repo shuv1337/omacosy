@@ -264,75 +264,75 @@ bundleId = "net.whatsapp.WhatsApp"
 id = "3720737C-A7C5-4F79-8BCB-B91CC805C84F"
 
 [[hotkeys]]
-binding = "Control+Option+Command+1"
+binding = "Command+1"
 id = "switchWorkspace.0"
 
 [[hotkeys]]
-binding = "Hyper+1"
+binding = "Command+Shift+1"
 id = "moveToWorkspace.0"
 
 [[hotkeys]]
-binding = "Control+Option+Command+2"
+binding = "Command+2"
 id = "switchWorkspace.1"
 
 [[hotkeys]]
-binding = "Hyper+2"
+binding = "Command+Shift+2"
 id = "moveToWorkspace.1"
 
 [[hotkeys]]
-binding = "Control+Option+Command+3"
+binding = "Command+3"
 id = "switchWorkspace.2"
 
 [[hotkeys]]
-binding = "Hyper+3"
+binding = "Command+Shift+3"
 id = "moveToWorkspace.2"
 
 [[hotkeys]]
-binding = "Control+Option+Command+4"
+binding = "Command+4"
 id = "switchWorkspace.3"
 
 [[hotkeys]]
-binding = "Hyper+4"
+binding = "Command+Shift+4"
 id = "moveToWorkspace.3"
 
 [[hotkeys]]
-binding = "Control+Option+Command+5"
+binding = "Command+5"
 id = "switchWorkspace.4"
 
 [[hotkeys]]
-binding = "Hyper+5"
+binding = "Command+Shift+5"
 id = "moveToWorkspace.4"
 
 [[hotkeys]]
-binding = "Control+Option+Command+6"
+binding = "Command+6"
 id = "switchWorkspace.5"
 
 [[hotkeys]]
-binding = "Hyper+6"
+binding = "Command+Shift+6"
 id = "moveToWorkspace.5"
 
 [[hotkeys]]
-binding = "Control+Option+Command+7"
+binding = "Command+7"
 id = "switchWorkspace.6"
 
 [[hotkeys]]
-binding = "Hyper+7"
+binding = "Command+Shift+7"
 id = "moveToWorkspace.6"
 
 [[hotkeys]]
-binding = "Control+Option+Command+8"
+binding = "Command+8"
 id = "switchWorkspace.7"
 
 [[hotkeys]]
-binding = "Hyper+8"
+binding = "Command+Shift+8"
 id = "moveToWorkspace.7"
 
 [[hotkeys]]
-binding = "Control+Option+Command+9"
+binding = "Command+9"
 id = "switchWorkspace.8"
 
 [[hotkeys]]
-binding = "Hyper+9"
+binding = "Command+Shift+9"
 id = "moveToWorkspace.8"
 
 [[hotkeys]]

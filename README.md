@@ -397,9 +397,10 @@ layout is native, so the split-hint machinery below simply isn't
 needed there. What changes: OmniWM draws the focus border (themed by
 theme-set), app-launching chords run through Karabiner rules that the
 switch installs and removes, and Super+Space opens OmniWM's command
-palette instead of Raycast. Direct `Command+1…9` also switches
-workspaces under OmniWM, preserving this fork's original workspace
-muscle memory alongside Caps Lock Super.
+palette instead of Raycast. Direct `Command+1…9` and
+`Command+Shift+1…9` are native OmniWM bindings, preserving this fork's
+original workspace muscle memory and working through virtual keyboards
+such as LAN Mouse; Caps Lock Super remains available through Karabiner.
 
 Beta honesty: multi-monitor under OmniWM is untested by the author so
 far, and docs/omniwm-port.md carries a ledger of upstream quirks found
