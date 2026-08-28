@@ -8,27 +8,19 @@ fails=0
 fail() { echo "FAIL: $*" >&2; fails=$((fails + 1)); }
 ok()   { echo "  ok: $*"; }
 
-# ---- 1. No Karabiner in executable surfaces (fork delta #1) ----
-exec_surfaces=(install.sh uninstall.sh Brewfile macos-defaults.sh helper bin config zsh themes patches)
-if grep -rin "karabiner" "${exec_surfaces[@]}" 2>/dev/null; then
-  fail "Karabiner reference in an executable surface (allowed only in *.md)"
-else
-  ok "no Karabiner in executable surfaces"
-fi
-[ -e config/karabiner ] && fail "config/karabiner exists" || ok "config/karabiner absent"
-grep -qi "capslock\|hidsystem" helper/main.swift \
-  && fail "capslock/IOHIDSystem back in helper/main.swift" \
-  || ok "no capslock subcommand in helper/main.swift"
+# ---- 1. Karabiner-backed Super and OmniWM command layer --------------------
+[ -f config/karabiner/karabiner.json ] || fail "Karabiner config missing"
+grep -q 'cask "karabiner-elements"' Brewfile || fail "Karabiner missing from Brewfile"
+grep -q 'omacosy-karabiner-omniwm' install.sh || fail "OmniWM Karabiner command layer not installed"
+grep -q 'omacosy-karabiner-omniwm' bin/omacosy-wm-switch \
+  || fail "WM switch does not manage OmniWM Karabiner rules"
+ok "Karabiner Super and OmniWM command layer present"
 
-# ---- 2. Super-direct bindings (fork delta #2) ----
+# ---- 2. Super bindings match the Karabiner chord ---------------------------
 tpl=config/aerospace/aerospace.template.toml
-if grep -qE "^cmd-ctrl-alt" "$tpl"; then
-  fail "cmd-ctrl-alt binding in $tpl (fork uses Super-direct cmd-* chords)"
-else
-  ok "all bindings Super-direct in $tpl"
-fi
-grep -q "^cmd-enter = 'exec-and-forget \$HOME/.local/bin/omacosy-spawn" "$tpl" \
-  || fail "cmd-enter must spawn the terminal through omacosy-spawn"
+grep -q "^cmd-ctrl-alt-enter = 'exec-and-forget \$HOME/.local/bin/omacosy-spawn" "$tpl" \
+  || fail "Super+Enter must spawn the terminal through omacosy-spawn"
+grep -q '^cmd-ctrl-alt-1' "$tpl" || fail "workspace bindings do not use Karabiner Super"
 grep -qE "<<<<<<<|>>>>>>>" "$tpl" && fail "conflict markers left in $tpl"
 
 # ---- 3. Fork-owned surfaces present (deltas #3, #4) ----

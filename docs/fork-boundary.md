@@ -26,19 +26,12 @@ enforces the machine-checkable parts.
 
 ## Deliberate deltas (fork-owned, survive every merge)
 
-1. **No Karabiner.** Super is Command directly. Karabiner-Elements,
-   its root services, driver extension, key monitoring, config copy,
-   and the `capslock off` helper subcommand are all removed. Karabiner
-   must not reappear in any executable surface: `install.sh`,
-   `uninstall.sh`, `Brewfile`, `helper/`, `bin/`, `config/`, `zsh/`,
-   `themes/`, `patches/`. (Markdown may mention it — the README's
-   migration notes deliberately do.)
-2. **Super-direct bindings.** Every binding in
-   `config/aerospace/aerospace.template.toml` uses plain `cmd-*`
-   chords. Zero `cmd-ctrl-alt` bindings. When upstream changes a
-   binding's *action*, adopt the action under this fork's chord (this
-   is exactly how upstream's `omacosy-spawn` serialization was taken:
-   `cmd-enter` → `omacosy-spawn @TERMINAL@`).
+1. **Karabiner Super.** Caps Lock is the dedicated Super key, remapped
+   to `cmd+ctrl+alt`. Keep Karabiner's config, install/uninstall round
+   trip, and OmniWM's temporary executable-command rules in sync.
+2. **Super bindings.** AeroSpace bindings use the upstream
+   `cmd-ctrl-alt-*` chords so they match Karabiner and OmniWM's
+   `Control+Option+Command` bindings.
 3. **Night Owl theme** (`themes/night-owl/`) and the Night Owl
    Starship port (`config/starship.toml`).
 4. **Hardened ffm build** in `install.sh`: staged build+sign in a
@@ -74,9 +67,9 @@ jj describe -m "merge: sync upstream <rev> — <summary>"
 jj bookmark set main -r @ && jj git push
 ```
 
-Conflict rules: fork chords win over upstream chords; upstream
-behavior improvements are adopted under fork chords; Karabiner
-reintroductions are dropped; `LICENSE` and credits are never weakened.
+Conflict rules: upstream WM and Karabiner behavior wins; the Owl themes,
+appearance sync, hardened FFM build, macOS 27 validation, `LICENSE`, and
+credits survive every merge.
 
 ## Known incidental artifacts
 
