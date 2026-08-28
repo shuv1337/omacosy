@@ -520,13 +520,24 @@ open -a AeroSpace
 sleep 1
 "$(command -v aerospace || echo /opt/homebrew/bin/aerospace)" reload-config 2>/dev/null || true
 
+# Karabiner's background service performs the remap; the settings app is
+# needed only on first install to approve its driver extension.
+if launchctl list 2>/dev/null | grep -q org.pqrs.service.agent.karabiner_console_user_server; then
+  log "Karabiner already running (Caps Lock -> Super)"
+else
+  log "Starting Karabiner-Elements (approve its driver extension, then quit the app)"
+  open -a Karabiner-Elements
+fi
+
 cat <<'EOF'
 
 Done. One-time macOS steps if this is a fresh machine:
-  1. Grant AeroSpace   System Settings -> Privacy & Security -> Accessibility
-  2. Korren isn't in the Brewfile — build it from the korren repo:
+  1. Grant AeroSpace and omacosy-gesture under Privacy & Security -> Accessibility
+  2. Grant omacosy-gesture under Privacy & Security -> Input Monitoring
+  3. Karabiner-Elements: approve its driver extension and Input Monitoring
+  4. Korren isn't in the Brewfile — build it from the korren repo:
        ./packaging/macos/build-app.sh --install
 
-Super = Command. Switch themes: theme-set <name> or Super+Option+Shift+T
+Super = hold Caps Lock. Switch themes: theme-set <name> or Super+Shift+T
 Back to a normal Mac any time:  ./uninstall.sh
 EOF
