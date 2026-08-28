@@ -16,6 +16,7 @@ brew "bat"
 brew "lazygit"
 brew "btop"
 brew "starship"
+brew "atuin"
 brew "jq"
 
 cask "font-jetbrains-mono-nerd-font"

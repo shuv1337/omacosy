@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Keep the paired Owl theme in step with the macOS system appearance.
+
+set -u
+REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+MODE_FILE="$HOME/.config/omacosy/theme-mode"
+CURRENT_THEME="$HOME/.config/omarchy/current/theme"
+
+sync_theme() {
+  mode="$(cat "$MODE_FILE" 2>/dev/null || true)"
+  if [ "$mode" = auto ]; then
+    if [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null || true)" = Dark ]; then
+      target=night-owl
+    else
+      target=light-owl
+    fi
+    current="$(basename "$(readlink "$CURRENT_THEME" 2>/dev/null || true)")"
+    if [ "$current" != "$target" ]; then
+      OMACOSY_THEME_SYNC=1 "$REPO_DIR/bin/theme-set" "$target"
+    fi
+  fi
+}
+
+if [ "${1:-}" = --once ]; then
+  sync_theme
+  exit
+fi
+
+while true; do
+  sync_theme
+  sleep 2
+done

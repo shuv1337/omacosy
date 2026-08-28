@@ -17,6 +17,8 @@ have() { [ -f "$MANIFEST" ] && grep -qxF "$1" "$MANIFEST"; }
 # Quitting AeroSpace restores windows it was managing.
 log "Stopping AeroSpace, the bar, borders"
 osascript -e 'quit app "AeroSpace"' 2>/dev/null || true
+launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.theme-sync.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.omacosy.theme-sync.plist" "$HOME/.local/bin/theme-sync"
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" 2>/dev/null || true
 rm -f "$HOME/Library/LaunchAgents/com.omacosy.borders.plist" "$HOME/.local/bin/omacosy-borders"
 launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
@@ -123,7 +125,7 @@ fi
 
 # theme-set / theme-next out of ~/.local/bin — only when they are OUR
 # symlinks (a user's own script of the same name survives)
-for t in theme-set theme-next omacosy-ws omacosy-toggle omacosy-focus-guard omacosy-ws-collapse omacosy-float omacosy-cycle omacosy-update omacosy-spawn omacosy-togglesplit; do
+for t in theme-set theme-next theme-sync omacosy-ws omacosy-toggle omacosy-focus-guard omacosy-ws-collapse omacosy-float omacosy-cycle omacosy-update omacosy-spawn omacosy-togglesplit; do
   target="$(readlink "$HOME/.local/bin/$t" 2>/dev/null || true)"
   case "$target" in *omacosy*) rm -f "$HOME/.local/bin/$t" ;; esac
 done

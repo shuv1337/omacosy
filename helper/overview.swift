@@ -212,23 +212,56 @@ func snapshotWorkspaces(mon: Int) -> (order: [String], wins: [String: [Win]], fo
 
 // --- theme ---------------------------------------------------------------
 
-func themeAccent() -> NSColor {
+struct OverviewTheme {
+    var accent = NSColor(calibratedRed: 0.31, green: 0.58, blue: 0.46, alpha: 1)
+    var label = NSColor(calibratedWhite: 0.85, alpha: 1)
+    var muted = NSColor(calibratedWhite: 0.55, alpha: 1)
+    var card = NSColor(calibratedWhite: 0.11, alpha: 1)
+    var preview = NSColor(calibratedWhite: 0.16, alpha: 1)
+    var chip = NSColor(calibratedWhite: 0.09, alpha: 1)
+    var hover = NSColor(calibratedWhite: 0.20, alpha: 1)
+    var dimOpacity: Float = 0.62
+}
+
+func loadOverviewTheme() -> OverviewTheme {
+    var theme = OverviewTheme()
     let f = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/omarchy/current/theme/borders.sh")
+        .appendingPathComponent(".config/omarchy/current/theme/sketchybar.sh")
     guard let text = try? String(contentsOf: f, encoding: .utf8) else {
-        return NSColor(calibratedRed: 0.31, green: 0.58, blue: 0.46, alpha: 1)
+        return theme
     }
+    var colors: [String: NSColor] = [:]
     for line in text.split(separator: "\n") {
-        guard let r = line.range(of: "ACTIVE_COLOR=0x") else { continue }
-        let hex = String(line[r.upperBound...]).prefix(8)
+        let parts = line.replacingOccurrences(of: "export ", with: "").split(separator: "=")
+        guard parts.count == 2, parts[1].hasPrefix("0x") else { continue }
+        let hex = parts[1].dropFirst(2).prefix(8)
         guard hex.count == 8, let v = UInt32(hex, radix: 16) else { continue }
-        return NSColor(
+        colors[String(parts[0])] = NSColor(
             calibratedRed: CGFloat((v >> 16) & 0xff) / 255,
             green: CGFloat((v >> 8) & 0xff) / 255,
             blue: CGFloat(v & 0xff) / 255,
             alpha: 1)
     }
-    return NSColor(calibratedRed: 0.31, green: 0.58, blue: 0.46, alpha: 1)
+    theme.accent = colors["ACCENT"] ?? theme.accent
+    theme.label = colors["LABEL_COLOR"] ?? theme.label
+    theme.muted = colors["MUTED"] ?? theme.muted
+
+    if let bg = colors["BAR_BG_SOLID"]?.usingColorSpace(.deviceRGB) {
+        let luminance = 0.2126 * bg.redComponent + 0.7152 * bg.greenComponent
+            + 0.0722 * bg.blueComponent
+        if luminance > 0.5 {
+            theme.card = NSColor(calibratedWhite: 0.965, alpha: 1)
+            theme.preview = NSColor(calibratedWhite: 0.89, alpha: 1)
+            theme.chip = NSColor(calibratedWhite: 0.94, alpha: 1)
+            theme.hover = NSColor(calibratedRed: 0.83, green: 0.91, blue: 0.97, alpha: 1)
+            theme.dimOpacity = 0.18
+        }
+    }
+    theme.card = colors["OVERVIEW_CARD_BG"] ?? theme.card
+    theme.preview = colors["OVERVIEW_PREVIEW_BG"] ?? theme.preview
+    theme.chip = colors["OVERVIEW_CHIP_BG"] ?? theme.chip
+    theme.hover = colors["OVERVIEW_HOVER_BG"] ?? theme.hover
+    return theme
 }
 
 // --- thumbnails (ScreenCaptureKit) ---------------------------------------
@@ -301,7 +334,7 @@ func refreshThumbs(_ ids: [UInt32]) {
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-let accent = themeAccent()
+var theme = loadOverviewTheme()
 
 // A NON-ACTIVATING panel (the Spotlight/Raycast recipe): it becomes
 // key — keyboard + clicks work instantly — WITHOUT activating our
@@ -538,7 +571,7 @@ final class ContentView: NSView {
             d.view.layer?.shadowOpacity = 0.55
             d.view.layer?.shadowRadius = 18
             d.view.layer?.shadowOffset = CGSize(width: 0, height: -6)
-            d.view.layer?.borderColor = accent.cgColor
+            d.view.layer?.borderColor = theme.accent.cgColor
             d.view.layer?.borderWidth = 2
         }
         d.view.frame = d.home.offsetBy(dx: p.x - d.start.x, dy: p.y - d.start.y)
@@ -563,8 +596,7 @@ final class ContentView: NSView {
                 }
             }
             for (_, ws, v, isChip) in hoverItems where isChip {
-                v.layer?.backgroundColor = NSColor(
-                    calibratedWhite: ws == chip ? 0.22 : 0.09, alpha: 1).cgColor
+                v.layer?.backgroundColor = (ws == chip ? theme.hover : theme.chip).cgColor
             }
         }
         drag = d
@@ -596,10 +628,9 @@ final class ContentView: NSView {
         for (_, ws, v, isChip) in hoverItems {
             let isHover = ws == key
             if isChip {
-                v.layer?.backgroundColor = NSColor(
-                    calibratedWhite: isHover ? 0.2 : 0.09, alpha: 1).cgColor
+                v.layer?.backgroundColor = (isHover ? theme.hover : theme.chip).cgColor
             } else if ws != focusedWs {
-                v.layer?.borderColor = accent.withAlphaComponent(0.55).cgColor
+                v.layer?.borderColor = theme.accent.withAlphaComponent(0.55).cgColor
                 v.layer?.borderWidth = isHover ? 1.5 : 0
             }
         }
@@ -716,14 +747,14 @@ func buildOverlay(_ snap: (order: [String], wins: [String: [Win]], focused: Stri
             let rect = NSRect(x: x, y: y - cardH, width: cardW, height: cardH)
             let card = NSView(frame: rect)
             card.wantsLayer = true
-            card.layer?.backgroundColor = NSColor(calibratedWhite: 0.11, alpha: 1).cgColor
+            card.layer?.backgroundColor = theme.card.cgColor
             card.layer?.cornerRadius = 12
             if ws == focused {
-                card.layer?.borderColor = accent.cgColor
+                card.layer?.borderColor = theme.accent.cgColor
                 card.layer?.borderWidth = 2
             }
             let num = label(String(ws.suffix(1)), size: 20, weight: .bold,
-                color: ws == focused ? accent : NSColor(calibratedWhite: 0.85, alpha: 1))
+                color: ws == focused ? theme.accent : theme.label)
             num.frame = NSRect(x: 14, y: cardH - 34, width: 40, height: 24)
             card.addSubview(num)
             // app icons beside the number, right-aligned
@@ -742,7 +773,7 @@ func buildOverlay(_ snap: (order: [String], wins: [String: [Win]], focused: Stri
                 // letterboxed the capture inside the slot
                 let sv = NSView(frame: slot)
                 sv.wantsLayer = true
-                sv.layer?.backgroundColor = NSColor(calibratedWhite: 0.16, alpha: 1).cgColor
+                sv.layer?.backgroundColor = theme.preview.cgColor
                 sv.layer?.cornerRadius = 6
                 sv.layer?.masksToBounds = true
                 if let t = thumbs[w.id] {
@@ -759,7 +790,7 @@ func buildOverlay(_ snap: (order: [String], wins: [String: [Win]], focused: Stri
             }
             if items.count > 4 {
                 let more = label("+\(items.count - 4)", size: 12, weight: .semibold,
-                    color: NSColor(calibratedWhite: 0.6, alpha: 1))
+                    color: theme.muted)
                 more.frame = NSRect(x: canvas.maxX - 34, y: canvas.minY + 6, width: 30, height: 16)
                 card.addSubview(more)
             }
@@ -786,14 +817,14 @@ func buildOverlay(_ snap: (order: [String], wins: [String: [Win]], focused: Stri
             let rect = NSRect(x: cx, y: rowY, width: chipW, height: chipsH)
             let chip = NSView(frame: rect)
             chip.wantsLayer = true
-            chip.layer?.backgroundColor = NSColor(calibratedWhite: 0.09, alpha: 1).cgColor
+            chip.layer?.backgroundColor = theme.chip.cgColor
             chip.layer?.cornerRadius = 6
             if ws == focused { // you-are-here, even without a card
-                chip.layer?.borderColor = accent.cgColor
+                chip.layer?.borderColor = theme.accent.cgColor
                 chip.layer?.borderWidth = 1.5
             }
             let d = label(String(ws.suffix(1)), size: 12, weight: .semibold,
-                color: ws == focused ? accent : NSColor(calibratedWhite: 0.55, alpha: 1))
+                color: ws == focused ? theme.accent : theme.muted)
             d.alignment = .center
             d.frame = NSRect(x: 0, y: 4, width: chipW, height: 16)
             chip.addSubview(d)
@@ -805,7 +836,7 @@ func buildOverlay(_ snap: (order: [String], wins: [String: [Win]], focused: Stri
     }
 
     let hint = label("click / 1-9 to switch · drag a card to reorder · esc or swipe down to close",
-        size: 12, weight: .regular, color: NSColor(calibratedWhite: 0.5, alpha: 1))
+        size: 12, weight: .regular, color: theme.muted)
     hint.alignment = .center
     hint.frame = NSRect(x: 0,
         y: (screen.frame.height + blockH) / 2 - blockH,
@@ -826,6 +857,7 @@ func buildOverlay(_ snap: (order: [String], wins: [String: [Win]], focused: Stri
 func showOverlay() {
     guard !overlayVisible else { return }
     overlayVisible = true
+    theme = loadOverviewTheme()
     // the backdrop orders front IMMEDIATELY — everything data-driven
     // (aerospace query, icons, thumbnails) fills in asynchronously, so
     // the swipe response is the window server's latency, nothing else
@@ -867,7 +899,7 @@ func showOverlay() {
                 CATransaction.setAnimationDuration(0.34)
                 CATransaction.setAnimationTimingFunction(
                     CAMediaTimingFunction(controlPoints: 0.19, 1.0, 0.22, 1.0))
-                placeholder.dimLayer.opacity = 0.62
+                placeholder.dimLayer.opacity = theme.dimOpacity
                 placeholder.wallLayer.opacity = 1
                 placeholder.wallLayer.setAffineTransform(.identity)
                 CATransaction.commit()

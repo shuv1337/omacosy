@@ -3,6 +3,7 @@
 export BAR_COLOR=0xff0b253a
 export BAR_BG_SOLID=0xff011627
 export ITEM_BG=0xff0b253a
+export ITEM_BORDER=0xff1d3b53
 export ACCENT=0xff7091ad
 export LABEL_COLOR=0xffd6deeb
 export ICON_COLOR=0xffd6deeb

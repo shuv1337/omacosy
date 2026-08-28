@@ -33,6 +33,8 @@ grep -qE "<<<<<<<|>>>>>>>" "$tpl" && fail "conflict markers left in $tpl"
 
 # ---- 3. Fork-owned surfaces present (deltas #3, #4) ----
 [ -f themes/night-owl/colors.toml ] || fail "themes/night-owl missing"
+[ -f themes/light-owl/colors.toml ] || fail "themes/light-owl missing"
+grep -q 'AppleInterfaceStyle' bin/theme-sync || fail "system appearance sync missing"
 grep -q "FFM_BUILD_DIR" install.sh || fail "staged ffm build gone from install.sh"
 
 # ---- 4. Compatibility identifiers preserved ----

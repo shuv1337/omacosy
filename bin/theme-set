@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# theme-set <name> — switch the whole desktop theme in one move.
+# theme-set <name|auto> — switch the whole desktop theme in one move.
 # Swaps ~/.config/omarchy/current/theme (the omarchy convention), then
 # nudges every consumer: Korren live-reloads on its own (it watches the
 # omarchy dir), the bar and borders both watch the theme and restyle
@@ -10,19 +10,38 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 THEMES_DIR="$REPO_DIR/themes"
 CURRENT_DIR="$HOME/.config/omarchy/current"
+MODE_FILE="$HOME/.config/omacosy/theme-mode"
 
 case "${1:-list}" in
   list)
+    echo auto
     for t in "$THEMES_DIR"/*/; do basename "$t"; done
     exit 0
     ;;
 esac
 
 NAME="$1"
+AUTO=0
+if [ "$NAME" = auto ]; then
+  AUTO=1
+  mkdir -p "$(dirname "$MODE_FILE")"
+  printf 'auto\n' > "$MODE_FILE"
+  if [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null || true)" = Dark ]; then
+    NAME=night-owl
+  else
+    NAME=light-owl
+  fi
+fi
+
 if [ ! -d "$THEMES_DIR/$NAME" ]; then
   echo "theme-set: unknown theme '$NAME'. Available:" >&2
   for t in "$THEMES_DIR"/*/; do basename "$t"; done >&2
   exit 1
+fi
+
+if [ "$AUTO" != 1 ] && [ "${OMACOSY_THEME_SYNC:-0}" != 1 ]; then
+  mkdir -p "$(dirname "$MODE_FILE")"
+  printf '%s\n' "$NAME" > "$MODE_FILE"
 fi
 
 mkdir -p "$CURRENT_DIR"
@@ -66,4 +85,8 @@ fi
 # (kqueue on ~/.config/omarchy/current), so the symlink swap above IS
 # the notification
 
-echo "theme: $NAME"
+if [ "$AUTO" = 1 ]; then
+  echo "theme: $NAME (auto)"
+else
+  echo "theme: $NAME"
+fi

@@ -323,6 +323,7 @@ launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.bar.plist" 2>/dev/null 
 launchctl load "$HOME/Library/LaunchAgents/com.omacosy.bar.plist"
 link "$REPO_DIR/bin/theme-set"  "$HOME/.local/bin/theme-set"
 link "$REPO_DIR/bin/theme-next" "$HOME/.local/bin/theme-next"
+link "$REPO_DIR/bin/theme-sync" "$HOME/.local/bin/theme-sync"
 link "$REPO_DIR/bin/omacosy-toggle" "$HOME/.local/bin/omacosy-toggle"
 link "$REPO_DIR/bin/omacosy-ws" "$HOME/.local/bin/omacosy-ws"
 link "$REPO_DIR/bin/omacosy-focus-guard" "$HOME/.local/bin/omacosy-focus-guard"
@@ -332,6 +333,21 @@ link "$REPO_DIR/bin/omacosy-spawn" "$HOME/.local/bin/omacosy-spawn"
 link "$REPO_DIR/bin/omacosy-togglesplit" "$HOME/.local/bin/omacosy-togglesplit"
 link "$REPO_DIR/bin/omacosy-float" "$HOME/.local/bin/omacosy-float"
 link "$REPO_DIR/bin/omacosy-cycle" "$HOME/.local/bin/omacosy-cycle"
+
+cat > "$HOME/Library/LaunchAgents/com.omacosy.theme-sync.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.omacosy.theme-sync</string>
+  <key>ProgramArguments</key><array><string>$HOME/.local/bin/theme-sync</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict>
+</plist>
+PLIST
+launchctl unload "$HOME/Library/LaunchAgents/com.omacosy.theme-sync.plist" 2>/dev/null || true
+launchctl load "$HOME/Library/LaunchAgents/com.omacosy.theme-sync.plist"
 
 # --- 3. omarchy theme convention -------------------------------------------
 # Canonical theme state lives at ~/.config/omarchy/current/theme (what the
@@ -350,8 +366,16 @@ if [ ! -e "$HOME/.config/omarchy/current/theme" ]; then
       i=$((i + 1))
     done
   fi
-  log "Applying default theme (tokyo-night)"
-  "$REPO_DIR/bin/theme-set" tokyo-night
+  log "Applying system-matched Owl theme"
+  "$REPO_DIR/bin/theme-set" auto
+elif [ ! -f "$HOME/.config/omacosy/theme-mode" ]; then
+  current_theme="$(basename "$(readlink "$HOME/.config/omarchy/current/theme" 2>/dev/null || true)")"
+  if [ "$current_theme" = night-owl ] || [ "$current_theme" = light-owl ]; then
+    "$REPO_DIR/bin/theme-set" auto
+  else
+    mkdir -p "$HOME/.config/omacosy"
+    printf '%s\n' "$current_theme" > "$HOME/.config/omacosy/theme-mode"
+  fi
 fi
 
 # --- 4. Point Korren at the omarchy theme -----------------------------------

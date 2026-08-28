@@ -186,7 +186,7 @@ as `re` and can be changed under `[directory.substitutions]`.
 | System glue | `omacosy-helper` (self-compiled) | `helper/main.swift` |
 | Prompt | starship | `config/starship.toml` |
 | Shell | zsh | `zsh/zshrc` + your `~/.zshrc.local` |
-| CLI stack | fzf, eza, zoxide, ripgrep, bat, lazygit, btop | wired in `zsh/zshrc` |
+| CLI stack | fzf, Atuin, eza, zoxide, ripgrep, bat, lazygit, btop | wired in `zsh/zshrc` |
 
 Why so much of it is self-built:
 
@@ -341,10 +341,12 @@ individually, so anything you opened while undocked stays put.
 `theme-set <name>` switches everything at once: bar, borders, wallpaper
 on every display, and any terminal that follows omarchy's
 `~/.config/omarchy/current/theme` convention (the author's does).
-`Super+Option+Shift+T` cycles.
+`Super+Option+Shift+T` cycles. `theme-set auto` follows the macOS appearance,
+using Light Owl by day and Night Owl in dark mode; selecting any named theme
+turns automatic switching off.
 
 Themes: `tokyo-night`, `catppuccin`, `gruvbox`, `osaka-jade`,
-`night-owl`. Each `themes/<name>/` holds `colors.toml` (omarchy's
+`night-owl`, `light-owl`. Each `themes/<name>/` holds `colors.toml` (omarchy's
 22-color palette), `sketchybar.sh` / `borders.sh` (bar and ring colors;
 the file keeps its omarchy name and format), and `backgrounds/`.
 
@@ -352,8 +354,10 @@ The first four themes retain their omarchy theme-pack backgrounds.
 Night Owl uses the canonical terminal palette with custom navy surfaces
 and a subtle slate focus accent (`#7091ad`) shared with the paired
 machine's Ghostty, Helium and Shuvcode themes. Its night-road wallpaper
-is the exact background selected on that machine. Copy a directory to
-add another theme.
+is the exact background selected on that machine. Light Owl follows Sarah
+Drasner's official daytime palette: warm white surfaces, ink text, navy focus,
+and blue, magenta, red, green and gold status colors. Copy a directory to add
+another theme.
 
 ## Tiling: dwindle
 

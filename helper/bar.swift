@@ -97,6 +97,66 @@ func aerospace(_ args: [String]) -> String {
     return String(data: data, encoding: .utf8) ?? ""
 }
 
+// macOS makes every AX window briefly look dead while the screen is locked.
+// AeroSpace can then adopt them again on the visible workspace and discard
+// the whole workspace tree. Disable management across that interval so its
+// in-memory tree stays frozen; the on-disk id -> workspace map is the fallback
+// if AeroSpace itself is relaunched while locked.
+let lockWorkspaceState = FileManager.default.homeDirectoryForCurrentUser
+    .appendingPathComponent(".local/state/omacosy/lock-workspaces")
+
+func suspendWorkspacesForLock() {
+    rebuildQueue.async {
+        // Never let an old map act on a newly reused WindowServer id if this
+        // lock arrives while AeroSpace is unavailable and cannot be sampled.
+        try? FileManager.default.removeItem(at: lockWorkspaceState)
+        let raw = aerospace(["list-windows", "--all", "--format", "%{window-id}\t%{workspace}"])
+        let rows = raw.split(separator: "\n").compactMap { line -> String? in
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard fields.count == 2, UInt32(fields[0]) != nil, !fields[1].isEmpty else { return nil }
+            return "\(fields[0])\t\(fields[1])"
+        }
+        if !rows.isEmpty {
+            try? FileManager.default.createDirectory(
+                at: lockWorkspaceState.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
+            try? (rows.joined(separator: "\n") + "\n").write(
+                to: lockWorkspaceState, atomically: true, encoding: .utf8)
+            tlog("lock: saved \(rows.count) window assignments")
+        }
+        _ = aerospace(["enable", "off"])
+    }
+}
+
+func resumeWorkspacesAfterUnlock() {
+    rebuildQueue.async {
+        _ = aerospace(["enable", "on"])
+        // Let apps republish their AX windows and AeroSpace complete its own
+        // tree restore first. Moving only mismatches leaves a successful
+        // native restore, including its split hierarchy, completely alone.
+        Thread.sleep(forTimeInterval: 1)
+        guard let saved = try? String(contentsOf: lockWorkspaceState, encoding: .utf8) else { return }
+        var wanted: [String: String] = [:]
+        for line in saved.split(separator: "\n") {
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            if fields.count == 2 { wanted[String(fields[0])] = String(fields[1]) }
+        }
+        var current: [String: String] = [:]
+        for line in aerospace(["list-windows", "--all", "--format", "%{window-id}\t%{workspace}"])
+            .split(separator: "\n") {
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            if fields.count == 2 { current[String(fields[0])] = String(fields[1]) }
+        }
+        var restored = 0
+        for (wid, workspace) in wanted where current[wid] != nil && current[wid] != workspace {
+            _ = aerospace(["move-node-to-workspace", "--window-id", wid, workspace])
+            restored += 1
+        }
+        tlog("unlock: restored \(restored) mismatched window assignments")
+        DispatchQueue.main.async { kickRebuild() }
+    }
+}
+
 let logURL = URL(fileURLWithPath: "/tmp/omacosy-bar.log")
 func tlog(_ m: String) {
     let line = "\(Date()) \(m)\n"
@@ -358,7 +418,7 @@ struct BarItem: Equatable {
 }
 
 // screen order, left to right
-let rightOrder = ["weather", "wifi", "bluetooth", "brightness", "volume", "battery", "clock", "activity"]
+let rightOrder = ["weather", "wifi", "bluetooth", "appearance", "brightness", "volume", "battery", "clock", "activity"]
 var rightItems: [String: BarItem] = [:]
 
 func set(_ name: String, _ mutate: (inout BarItem) -> Void) {
@@ -387,6 +447,21 @@ func shell(_ launch: String, _ args: [String]) -> String {
     return String(data: out, encoding: .utf8) ?? ""
 }
 
+func updateAppearance() {
+    let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    set("appearance") {
+        $0.icon = dark ? "󰖔" : "󰖙"
+        $0.iconColor = dark ? palette.muted : palette.accent
+    }
+}
+
+func toggleAppearance() {
+    DispatchQueue.global(qos: .userInitiated).async {
+        _ = shell("/usr/bin/osascript", ["-e",
+            "tell application \"System Events\" to tell appearance preferences to set dark mode to not dark mode"])
+    }
+}
+
 // --- clock (no publisher: the one honest timer, aligned to the minute)
 func updateClock() {
     let f = DateFormatter()
@@ -408,13 +483,13 @@ func updateBattery() {
         // same thresholds and glyphs the bar already uses
         var icon = "󰂃", color = palette.red
         switch pct {
-        case 90...: icon = "󰁹"; color = palette.green
+        case 90...: icon = "󰁹"; color = palette.accent
         case 60..<90: icon = "󰂀"; color = palette.label
         case 30..<60: icon = "󰁾"; color = palette.label
         case 10..<30: icon = "󰁻"; color = palette.yellow
         default: break
         }
-        if charging { icon = "󰂄"; color = palette.green }
+        if charging { icon = "󰂄"; color = palette.accent }
         set("battery") { $0.icon = icon; $0.iconColor = color; $0.label = "\(pct)%" }
         return
     }
@@ -871,7 +946,11 @@ func weatherEmoji(_ code: Int, night: Bool) -> String {
     case 299, 302, 305, 308, 356, 359: return "🌧️"
     case 200, 386, 389, 392, 395: return "⛈️"
     case 179, 182, 185, 227, 230, 281, 284, 311...338, 350, 362...368, 374...377: return "❄️"
-    default: return "🌡️"
+    // No glyph for a code we do not recognise — including the 0 a
+    // missing weatherCode falls back to, which is how a thermometer
+    // ended up standing in for "wttr said nothing useful". The
+    // temperature alone reads better than a placeholder.
+    default: return ""
     }
 }
 
@@ -954,7 +1033,10 @@ func updateWeather() {
 
         DispatchQueue.main.async {
             weather = w
-            set("weather") { $0.icon = ""; $0.label = "\(w.emoji) \(w.temp)°F" }
+            set("weather") {
+                $0.icon = ""
+                $0.label = w.emoji.isEmpty ? "\(w.temp)°F" : "\(w.emoji) \(w.temp)°F"
+            }
             if openPopup == "weather" { refreshPopup() }
         }
     }.resume()
@@ -1357,7 +1439,8 @@ func bluetoothRows() -> [PopupRow] {
 
 func weatherRows() -> [PopupRow] {
     guard let w = weather else { return [] }
-    var rows: [PopupRow] = [PopupRow(text: "\(w.emoji) \(w.temp)°F \(w.desc)", hero: true)]
+    let head = w.emoji.isEmpty ? "\(w.temp)°F \(w.desc)" : "\(w.emoji) \(w.temp)°F \(w.desc)"
+    var rows: [PopupRow] = [PopupRow(text: head, hero: true)]
 
     // feels-like earns a mention only when it differs from the real temp
     var today = "today \(w.low)° → \(w.high)°F"
@@ -2004,6 +2087,8 @@ final class BarView: NSView {
         }
         closePopup()
         switch name {
+        case "appearance":
+            toggleAppearance()
         case "battery":
             NSWorkspace.shared.open(
                 URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension")!)
@@ -2498,6 +2583,12 @@ watch(FileManager.default.homeDirectoryForCurrentUser
     let t0 = DispatchTime.now().uptimeNanoseconds
     palette = loadPalette()
     iconCache.removeAll()
+    if var activity = rightItems["activity"] {
+        activity.iconColor = palette.accent
+        rightItems["activity"] = activity
+    }
+    updateAppearance()
+    updateBattery()
     repaint()
     if cheatWindow != nil { hideCheatsheet(); toggleCheatsheet() } // repaint in the new palette
     let ms = Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000
@@ -2627,6 +2718,38 @@ locationGate.start()
 // bluetooth: gated on the privacy grant, which the watcher above also needs
 bluetoothWatcher.start()
 
+// Freeze AeroSpace before either the screen saver or login window makes AX
+// windows disappear. Some systems emit both pairs, so track their states and
+// resume only after neither one is covering the session.
+var screenSaverActive = false
+var screenLocked = false
+var workspaceProtectionActive = false
+
+func updateWorkspaceProtection() {
+    let shouldProtect = screenSaverActive || screenLocked
+    guard shouldProtect != workspaceProtectionActive else { return }
+    workspaceProtectionActive = shouldProtect
+    if shouldProtect { suspendWorkspacesForLock() } else { resumeWorkspacesAfterUnlock() }
+}
+
+let sessionNotifications: [(String, Bool, (Bool) -> Void)] = [
+    ("com.apple.screensaver.didstart", true, { screenSaverActive = $0 }),
+    ("com.apple.screensaver.didstop", false, { screenSaverActive = $0 }),
+    ("com.apple.screenIsLocked", true, { screenLocked = $0 }),
+    ("com.apple.screenIsUnlocked", false, { _ in
+        screenLocked = false
+        screenSaverActive = false
+    }),
+]
+for (name, active, update) in sessionNotifications {
+    DistributedNotificationCenter.default().addObserver(
+        forName: NSNotification.Name(name), object: nil, queue: .main
+    ) { _ in
+        update(active)
+        updateWorkspaceProtection()
+    }
+}
+
 // waking clears the gamma table, so the shade has to be reasserted
 NSWorkspace.shared.notificationCenter.addObserver(
     forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
@@ -2638,6 +2761,10 @@ NSWorkspace.shared.notificationCenter.addObserver(
 DistributedNotificationCenter.default().addObserver(
     forName: NSNotification.Name("\(spotifyBundleID).PlaybackStateChanged"), object: nil, queue: .main
 ) { note in updateMedia(from: note.userInfo) }
+
+DistributedNotificationCenter.default().addObserver(
+    forName: NSNotification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main
+) { _ in updateAppearance() }
 
 for event in [NSWorkspace.didLaunchApplicationNotification,
               NSWorkspace.didTerminateApplicationNotification] {
@@ -2674,6 +2801,7 @@ guard !surfaces.isEmpty else {
 }
 apply(fetchSnapshot()) // blocking is fine here: the run loop has not started
 rightItems["activity"] = BarItem(icon: "󰍛", iconColor: palette.accent)
+updateAppearance()
 applyShade() // restore the level this machine was left at
 updateBattery()
 updateBrightness()
