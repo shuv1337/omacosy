@@ -1819,7 +1819,9 @@ func karabinerExecCheatEntries() -> [CheatEntry] {
             let hasShift = mods.contains("shift")
             let key = keyCode == "return_or_enter" ? "Enter"
                 : keyCode == "spacebar" ? "Space" : keyCode.uppercased()
-            let chord = "Super+" + (hasShift ? "Shift+" : "") + key
+            let chord = mods.contains("control") && mods.contains("option")
+                ? "Super+" + (hasShift ? "Shift+" : "") + key
+                : "Cmd+" + (hasShift ? "Shift+" : "") + key
             entries.append(CheatEntry(group: "Apps and system (Karabiner)",
                 key: chord, action: String(desc.dropFirst("omacosy-omniwm: ".count))))
         }

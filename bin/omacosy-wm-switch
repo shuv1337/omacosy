@@ -45,6 +45,7 @@ start_aerospace_world() {
   cp "$REPO/config/gesture/config.json" "$HOME/.config/omacosy/gesture.json" 2>/dev/null || true
   launchctl load "$HOME/Library/LaunchAgents/com.omacosy.ffm.plist" 2>/dev/null || true
   launchctl load "$HOME/Library/LaunchAgents/com.omacosy.gesture.plist" 2>/dev/null || true
+  launchctl kickstart -k "gui/$(id -u)/com.omacosy.bar" 2>/dev/null || true
 }
 
 stop_aerospace_world() {
@@ -100,6 +101,9 @@ omniwm)
   REPO="$(cd "$(dirname "$(readlink "$HOME/.local/bin/omacosy-wm-switch" || echo "$0")")/.." && pwd)"
   cp "$REPO/config/gesture/config.omniwm.json" "$HOME/.config/omacosy/gesture.json" 2>/dev/null || true
   launchctl load "$HOME/Library/LaunchAgents/com.omacosy.gesture.plist" 2>/dev/null || true
+  # Start the bar inside the destination WM so its monitor ids and
+  # active-workspace watch cannot inherit the AeroSpace session.
+  launchctl kickstart -k "gui/$(id -u)/com.omacosy.bar" 2>/dev/null || true
   echo
   echo "  VERIFY NOW: switch workspaces with Super+1 and Super+2."
   echo "  Type 'yes' within 90 seconds if it works."

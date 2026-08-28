@@ -73,6 +73,12 @@ rules = [
     rule("close window", "w", SUPER, to_key="w", to_mods=["command"]),
 ]
 
+# Keep the fork's direct Command workspace muscle memory alongside the
+# Caps-Lock Super bindings OmniWM handles natively.
+for workspace in range(1, 10):
+    rules.append(rule(f"workspace {workspace}", str(workspace), ["command"],
+        cmd=f"/opt/homebrew/bin/omniwmctl command switch-workspace {workspace} >/dev/null 2>&1"))
+
 with open(path) as f:
     cfg = json.load(f)
 
